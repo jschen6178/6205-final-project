@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import time
 from pathlib import Path
 
 # Load the image
@@ -8,14 +7,17 @@ cwd = Path(__file__).parent
 image = cv2.imread(str(cwd / "humans.jpg"))
 
 binary = np.ones((np.shape(image)[0], np.shape(image)[1]))
+green_screen_sim = image.copy()
 
-for i in range(np.shape(image)[0]):
-    for j in range(np.shape(image)[1]):
+for i in range(image.shape[0]):
+    for j in range(image.shape[1]):
         if image[i, j, 2] < image[i, j, 0] - 16:
             binary[i, j] = 0
+            green_screen_sim[i, j] = [0, 255, 0]
         else:
             binary[i, j] = 1
 
+cv2.imwrite(str(cwd / "human_green_screen.png"), green_screen_sim)
 # Save the binary mask as an image
 cv2.imwrite(str(cwd / "binary_mask_1bit.png"), binary * 255)
 
@@ -27,6 +29,7 @@ def calculate_A(p):
             count += 1
     return count
 
+
 dx = np.array([0, -1, -1, 0, 1, 1, 1, 0, -1])
 dy = np.array([0, 0, 1, 1, 1, 0, -1, -1, -1])
 
@@ -35,8 +38,8 @@ for _ in range(NUM_ITERS):
     print(f"Iteration {_}")
     count = 0
     new_image = binary.copy()
-    for i in range(1, np.shape(image)[0] - 1):
-        for j in range(1, np.shape(image)[1] - 1):
+    for i in range(1, image.shape[0] - 1):
+        for j in range(1, image.shape[1] - 1):
             p = binary[i + dx, j + dy]
 
             B_p = np.sum(p[1:])  # neighbors of p1
@@ -57,8 +60,8 @@ for _ in range(NUM_ITERS):
     if count == 0:
         break
     count = 0
-    for i in range(1, np.shape(image)[0] - 1):
-        for j in range(1, np.shape(image)[1] - 1):
+    for i in range(1, image.shape[0] - 1):
+        for j in range(1, image.shape[1] - 1):
             p = binary[i + dx, j + dy]
 
             B_p = np.sum(p[1:])  # neighbors of p1
@@ -81,3 +84,8 @@ for _ in range(NUM_ITERS):
 
 
 cv2.imwrite(str(cwd / "binary_mask_1bit_skeleton.png"), binary * 255)
+for i in range(image.shape[0]):
+    for j in range(image.shape[1]):
+        if binary[i, j] == 1:
+            green_screen_sim[i, j] = [0, 0, 255]
+cv2.imwrite(str(cwd / "human_skeleton_overlay.png"), green_screen_sim)
