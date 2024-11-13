@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1728401724" />
+    <testcase name="test_a" classname="test_center_of_mass" file="/Users/jc/Documents/6205-digital-systems-lab/lab05/sim/test_center_of_mass.py" lineno="20" time="43.763205766677856" sim_time_ns="9860070.001" ratio_time="225305.02115335542" />
+  </testsuite>
+</testsuites>
