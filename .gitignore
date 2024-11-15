@@ -1,1 +1,4 @@
 .venv/
+_history/
+obj/
+!obj/final.bit
