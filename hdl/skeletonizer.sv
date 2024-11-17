@@ -10,11 +10,11 @@ module skeletonizer #(
     input wire [VWIDTH-1:0] vcount_in,
     input wire pixel_in,
     input wire pixel_valid_in,
-    output wire skeleton_out,
-    output wire hcount_out,
-    output wire vcount_out,
-    output wire pixel_valid_out,
-    output wire busy
+    output logic skeleton_out,
+    output logic [HWIDTH-1:0] hcount_out,
+    output logic [VWIDTH-1:0] vcount_out,
+    output logic pixel_valid_out,
+    output logic busy
 );
   localparam int HWIDTH = $clog2(HORIZONTAL_COUNT);
   localparam int VWIDTH = $clog2(VERTICAL_COUNT);
@@ -41,11 +41,8 @@ module skeletonizer #(
   logic [3:0] count_a, count_b;
   always_comb begin
     if (outputting) begin
-      skeleton_out = frame_buffer_out;
-      hcount_out   = iter_hcount;
-      vcount_out   = iter_vcount;
     end else if (busy) begin
-      write_addr = line_buffer_vcount_pipe * HORIZONTAL_COUNT + line_buffer_hcount_pipe;
+      write_addr = line_buf_vcount_pipe * HORIZONTAL_COUNT + line_buf_hcount_pipe;
       if (line_buf_hcount_pipe == 0 || line_buf_hcount_pipe == HORIZONTAL_COUNT - 1 ||
           line_buf_vcount_pipe == 0 || line_buf_vcount_pipe == VERTICAL_COUNT - 1) begin
         write_data = 0;
@@ -122,6 +119,15 @@ module skeletonizer #(
           iter_hcount <= iter_hcount + 1;
         end
       end
+      if (outputting) begin
+        skeleton_out <= frame_buffer_out;
+        hcount_out   <= iter_hcount;
+        vcount_out   <= iter_vcount;
+      end else begin
+        skeleton_out <= 0;
+        hcount_out   <= hcount_in;
+        vcount_out   <= vcount_in;
+      end
     end
   end
 
@@ -151,7 +157,7 @@ module skeletonizer #(
       //writing port:
       .addra(write_addr),  // Port A address bus,
       .dina(write_data),  // Port A RAM input data
-      .wea(busy || data_valid_in),  // Port A write enable
+      .wea(busy || pixel_valid_in),  // Port A write enable
       //reading port:
       .addrb(iter_vcount * HORIZONTAL_COUNT + iter_hcount),  // Port B address bus,
       .doutb(frame_buffer_out),  // Port B RAM output data,
