@@ -1,8 +1,8 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
 ---------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2024.1 (lin64) Build 5076996 Wed May 22 18:36:09 MDT 2024
-| Date         : Tue Nov 12 21:47:29 2024
-| Host         : eecs-digital-27 running 64-bit Ubuntu 24.04.1 LTS
+| Date         : Tue Nov 12 22:38:02 2024
+| Host         : eecs-digital-02 running 64-bit Ubuntu 24.04.1 LTS
 | Command      : report_utilization -file obj/post_synth_util.rpt -hierarchical -hierarchical_depth 4
 | Design       : top_level
 | Device       : xc7s50csga324-1
@@ -22,7 +22,7 @@ Table of Contents
 +----------------------------------------------+------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 |                   Instance                   |                  Module                  | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
 +----------------------------------------------+------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
-| top_level                                    |                                    (top) |       6837 |       6376 |     444 |   17 | 5694 |     28 |      9 |          7 |
+| top_level                                    |                                    (top) |       6849 |       6388 |     444 |   17 | 5694 |     28 |      9 |          7 |
 |   (top_level)                                |                                    (top) |          0 |          0 |       0 |    0 |  111 |      0 |      0 |          0 |
 |   blue_ser                                   |                          tmds_serializer |          0 |          0 |       0 |    0 |    0 |      0 |      0 |          0 |
 |   camera_data_fifo                           |                            ddr_fifo_wrap |        147 |        147 |       0 |    0 |  234 |      2 |      0 |          0 |
@@ -73,10 +73,9 @@ Table of Contents
 |       inst_blk_mem_gen                       |    blk_mem_gen_0blk_mem_gen_v8_4_8_synth |        122 |        122 |       0 |    0 |   20 |     24 |      8 |          0 |
 |         gnbram.gnativebmg.native_blk_mem_gen |             blk_mem_gen_0blk_mem_gen_top |        122 |        122 |       0 |    0 |   20 |     24 |      8 |          0 |
 |   green_ser                                  |                        tmds_serializer_0 |          0 |          0 |       0 |    0 |    0 |      0 |      0 |          0 |
-|   mcs                                        |                           channel_select |         18 |         18 |       0 |    0 |    0 |      0 |      0 |          0 |
 |   mssc                                       |                                lab05_ssc |         35 |         35 |       0 |    0 |   25 |      0 |      0 |          0 |
-|   mt                                         |                                threshold |          1 |          1 |       0 |    0 |    1 |      0 |      0 |          0 |
-|   mvm                                        |                                video_mux |         38 |         38 |       0 |    0 |    0 |      0 |      0 |          0 |
+|   mt                                         |                                threshold |         16 |         16 |       0 |    0 |    1 |      0 |      0 |          0 |
+|   mvm                                        |                                video_mux |         31 |         31 |       0 |    0 |    0 |      0 |      0 |          0 |
 |   pdfifo                                     |                          ddr_fifo_wrap_1 |        146 |        146 |       0 |    0 |  234 |      2 |      0 |          0 |
 |     (pdfifo)                                 |                          ddr_fifo_wrap_1 |          2 |          2 |       0 |    0 |    0 |      0 |      0 |          0 |
 |     xpm_fifo_axis_inst                       |                            xpm_fifo_axis |        144 |        144 |       0 |    0 |  234 |      2 |      0 |          0 |
@@ -107,13 +106,13 @@ Table of Contents
 |     write_address_evt_counter                |                            evt_counter_6 |         21 |         21 |       0 |    0 |   27 |      0 |      0 |          0 |
 |   red_ser                                    |                        tmds_serializer_2 |          1 |          1 |       0 |    0 |    1 |      0 |      0 |          0 |
 |   registers                                  |        xilinx_single_port_ram_read_first |          6 |          6 |       0 |    0 |    0 |      0 |      1 |          0 |
-|   rgbtoycrcb_m                               |                             rgb_to_ycrcb |         92 |         92 |       0 |    0 |   50 |      0 |      0 |          7 |
+|   rgbtoycrcb_m                               |                             rgb_to_ycrcb |        251 |        251 |       0 |    0 |   50 |      0 |      0 |          7 |
 |   stacker_inst                               |                                  stacker |          7 |          7 |       0 |    0 |  253 |      0 |      0 |          0 |
 |   tmds_blue                                  |                             tmds_encoder |          2 |          2 |       0 |    0 |   14 |      0 |      0 |          0 |
-|   tmds_green                                 |                           tmds_encoder_3 |          4 |          4 |       0 |    0 |   14 |      0 |      0 |          0 |
-|   tmds_red                                   |                           tmds_encoder_4 |          3 |          3 |       0 |    0 |   14 |      0 |      0 |          0 |
+|   tmds_green                                 |                           tmds_encoder_3 |          2 |          2 |       0 |    0 |   14 |      0 |      0 |          0 |
+|   tmds_red                                   |                           tmds_encoder_4 |          2 |          2 |       0 |    0 |   14 |      0 |      0 |          0 |
 |   unstacker_inst                             |                                unstacker |        152 |        152 |       0 |    0 |  133 |      0 |      0 |          0 |
-|   vsg                                        |                            video_sig_gen |        215 |        215 |       0 |    0 |   22 |      0 |      0 |          0 |
+|   vsg                                        |                            video_sig_gen |         81 |         81 |       0 |    0 |   22 |      0 |      0 |          0 |
 |   wizard_hdmi                                |                          cw_hdmi_clk_wiz |          0 |          0 |       0 |    0 |    0 |      0 |      0 |          0 |
 |   wizard_migcam                              |                          cw_fast_clk_wiz |          0 |          0 |       0 |    0 |    0 |      0 |      0 |          0 |
 +----------------------------------------------+------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+

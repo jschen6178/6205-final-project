@@ -17,7 +17,7 @@ module channel_select(
       3'b000: channel = g_in;
       3'b001: channel = r_in;
       3'b010: channel = b_in;
-      3'b011: channel = 5'b0;
+      3'b011: channel = g_in - (r_in>>1) - (b_in>>1);
       3'b100: channel = y_in;
       3'b101: channel = cr_in;
       3'b110: channel = cb_in;
