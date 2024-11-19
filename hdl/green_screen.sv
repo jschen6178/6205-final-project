@@ -5,8 +5,6 @@
 // green is 0
 module green_screen(
   input wire [7:0] r_in, g_in, b_in,
-  input wire [10:0] hcount,
-  input wire [9:0] vcount,
   output logic bit_mask
 );
 logic signed [8:0] signed_r_in, signed_g_in, signed_b_in;
