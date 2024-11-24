@@ -3,6 +3,7 @@
 
 module video_mux (
     input wire [1:0] bg_in,  //regular video
+    input wire bin_in,
     input wire [23:0] camera_pixel_in,  //16 bits from camera 5:6:5
     input wire thresholded_pixel_in,  //
     output logic [23:0] pixel_out
@@ -25,6 +26,7 @@ module video_mux (
   always_comb begin
     case (bg_in)
       2'b00:   l_1 = camera_pixel_in;
+      2'b01:   l_1 = (bin_in != 0) ? 24'h00FF00 : camera_pixel_in;
       2'b10:   l_1 = (thresholded_pixel_in != 0) ? 24'hFFFFFF : 24'h000000;
       2'b11:   l_1 = (thresholded_pixel_in != 0) ? 24'hFF77AA : camera_pixel_in;
       default: l_1 = camera_pixel_in;

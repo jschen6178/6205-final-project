@@ -143,64 +143,6 @@ module top_level (
       .pixel_data_out(camera_pixel)
   );
 
-  // Skeletonization logic
-
-  logic [10:0] binner_hcount;
-  logic [ 9:0] binner_vcount;
-  logic        binner_pixel;
-  logic        binner_valid;
-
-  binning_2 binner (
-      .clk_in(clk_camera),
-      .rst_in(sys_rst_camera),
-      .hcount_in(camera_hcount),
-      .vcount_in(camera_vcount),
-      .pixel_data_in(camera_pixel),
-      .data_valid_in(camera_valid),
-      .pixel_out(binner_pixel),
-      .hcount_out(binner_hcount),
-      .vcount_out(binner_vcount),
-      .data_valid_out(binner_valid)
-  );
-
-  logic [10:0] skeleton_hcount;
-  logic [ 9:0] skeleton_vcount;
-  logic        skeleton_pixel;
-  logic        skeleton_valid;
-  logic        skeleton_busy;
-  logic        should_input_skeleton;
-
-  always_ff @(posedge clk_camera) begin
-    if (sys_rst_camera) begin
-      should_input_skeleton <= 0;
-    end else begin
-      if (!skeleton_busy && binner_hcount == 319 && binner_vcount == 179) begin
-        should_input_skeleton <= 1;
-      end else if (skeleton_busy) begin
-        should_input_skeleton <= 0;
-      end
-    end
-  end
-
-  skeletonizer skeletonizer_inst (
-      .clk_in(clk_camera),
-      .rst_in(sys_rst_camera),
-      .hcount_in(binner_hcount),
-      .vcount_in(binner_vcount),
-      .pixel_in(binner_pixel),
-      .pixel_valid_in(binner_valid && should_input_skeleton),
-      .pixel_out(skeleton_pixel),
-      .pixel_valid_out(skeleton_valid),
-      .hcount_out(skeleton_hcount),
-      .vcount_out(skeleton_vcount),
-      .busy(skeleton_busy)
-  );
-
-  // TODO: store skeleton output in a frame buffer
-
-  // Frame buffer stuff (Try not to touch)
-
-  logic [ 15:0] frame_buff_dram;  // data out of DRAM frame buffer
 
   // 2. The New Way: write memory to DRAM and read it out, over a couple AXI-Stream data pipelines.
   // NEW DRAM STUFF STARTS HERE
@@ -473,6 +415,64 @@ module top_level (
       .mask_out(mask)  //single bit if pixel within mask.
   );
 
+  // Skeletonization logic
+
+  logic [10:0] binner_hcount;
+  logic [ 9:0] binner_vcount;
+  logic        binner_pixel;
+  logic        binner_valid;
+
+  binning_2 binner (
+      .clk_in(clk_camera),
+      .rst_in(sys_rst_camera),
+      .hcount_in(camera_hcount),
+      .vcount_in(camera_vcount),
+      .pixel_data_in(mask),
+      .data_valid_in(camera_valid),
+      .pixel_data_out(binner_pixel),
+      .hcount_out(binner_hcount),
+      .vcount_out(binner_vcount),
+      .data_valid_out(binner_valid)
+  );
+
+  logic [10:0] skeleton_hcount;
+  logic [ 9:0] skeleton_vcount;
+  logic        skeleton_pixel;
+  logic        skeleton_valid;
+  logic        skeleton_busy;
+  logic        should_input_skeleton;
+
+  always_ff @(posedge clk_camera) begin
+    if (sys_rst_camera) begin
+      should_input_skeleton <= 0;
+    end else begin
+      if (!skeleton_busy && binner_hcount == 319 && binner_vcount == 179) begin
+        should_input_skeleton <= 1;
+      end else if (skeleton_busy) begin
+        should_input_skeleton <= 0;
+      end
+    end
+  end
+
+  skeletonizer skeletonizer_inst (
+      .clk_in(clk_camera),
+      .rst_in(sys_rst_camera),
+      .hcount_in(binner_hcount),
+      .vcount_in(binner_vcount),
+      .pixel_in(binner_pixel),
+      .pixel_valid_in(binner_valid && should_input_skeleton),
+      .skeleton_out(skeleton_pixel),
+      .pixel_valid_out(skeleton_valid),
+      .hcount_out(skeleton_hcount),
+      .vcount_out(skeleton_vcount),
+      .busy(skeleton_busy)
+  );
+
+  // TODO: store skeleton output in a frame buffer
+
+  // Frame buffer stuff (Try not to touch)
+
+  logic [ 15:0] frame_buff_dram;  // data out of DRAM frame buffer
 
   logic [6:0] ss_c;
   //modified version of seven segment display for showing
@@ -518,6 +518,7 @@ module top_level (
 
   video_mux mvm (
       .bg_in(display_choice),  //choose background
+      .bin_in(binner_pixel),
       .camera_pixel_in({fb_red, fb_green, fb_blue}),
       .thresholded_pixel_in(mask),  //one bit mask signal
       .pixel_out({red, green, blue})  //output to tmds

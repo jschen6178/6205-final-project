@@ -27,7 +27,7 @@ module binning_2 #(
 
   logic [KERNEL_SIZE-1:0] weebs;
   logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] pixel_outs;
-  logic [LOG_MAX_COUNT] mask_count;
+  logic [LOG_MAX_COUNT:0] mask_count;
 
   logic data_valid_in_pipe;
   logic [HWIDTH-1:0] hcount_in_pipe;
@@ -47,7 +47,8 @@ module binning_2 #(
 
   always_ff @(posedge clk_in) begin
     if (rst_in) begin
-      weebs <= 1'b1 << KERNEL_SIZE;
+      weebs <= 1'b1 << (KERNEL_SIZE-1);
+      mask_count <= 0;
       data_valid_out <= 1'b0;
       data_valid_in_pipe <= 1'b0;
     end else begin
