@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1732429443" />
-    <testcase name="test_a" classname="test_binning_2" file="/Users/jc/Documents/GitHub/6205-final-project/build/sim/test_binning_2.py" lineno="19" time="0.6023099422454834" sim_time_ns="128050.001" ratio_time="212598.18578224743" />
-  </testsuite>
-</testsuites>

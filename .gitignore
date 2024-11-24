@@ -3,3 +3,5 @@ _history/
 obj/
 !obj/final.bit
 a.out
+sim_build/
+__pycache__/
