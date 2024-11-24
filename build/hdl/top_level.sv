@@ -104,36 +104,13 @@ module top_level (
   // rgb output values
   logic [7:0] red, green, blue;
 
-
-
-  // used in week 6 part 2: clock domain crossing for our center of mass values
-  logic zoom_view;
-  assign zoom_view = (sw[7:6] == 2'b11);
-
-  // Center of Mass variables, just defined higher up now
-  logic [10:0] x_com, x_com_calc, zoom_center_x;  //long term x_com and output from module, resp
-  logic [9:0] y_com, y_com_calc, zoom_center_y;  //long term y_com and output from module, resp
-  logic       new_com;  //used to know when to update x_com and y_com ...
-
-  // // uncomment in part 2!
-  // logic [10:0] center_x_ui;
-  // logic [9:0] center_y_ui;
-  // xpm_cdc_array_single #(
-  //   .WIDTH(21)
-  //   ) com_sync (
-  //   .src_clk(clk_pixel),
-  //   .dest_clk(clk_ui),
-  //   .src_in({zoom_center_x, zoom_center_y}),
-  //   .dest_out({center_x_ui,center_y_ui}));
-
-
   // ** Handling input from the camera **
 
   // synchronizers to prevent metastability
-  logic [7:0] camera_d_buf                                               [1:0];
-  logic       cam_hsync_buf                                              [1:0];
-  logic       cam_vsync_buf                                              [1:0];
-  logic       cam_pclk_buf                                               [1:0];
+  logic [7:0] camera_d_buf [1:0];
+  logic       cam_hsync_buf[1:0];
+  logic       cam_vsync_buf[1:0];
+  logic       cam_pclk_buf [1:0];
 
   always_ff @(posedge clk_camera) begin
     camera_d_buf[1]  <= camera_d;
@@ -166,73 +143,64 @@ module top_level (
       .pixel_data_out(camera_pixel)
   );
 
-  // Two ways to store a frame buffer: subsampled BRAM, and full-quality DRAM.
+  // Skeletonization logic
 
-  logic [15:0] frame_buff_bram;  // data out of BRAM frame buffer
-  logic [15:0] frame_buff_dram;  // data out of DRAM frame buffer
-  logic [15:0] frame_buff_raw;  // select between the two!
-  assign frame_buff_raw = sw[0] ? frame_buff_dram : frame_buff_bram;
+  logic [10:0] binner_hcount;
+  logic [ 9:0] binner_vcount;
+  logic        binner_pixel;
+  logic        binner_valid;
 
-  // 1. The old way: BRAM frame buffer.
-
-  //two-port BRAM used to hold image from camera.
-  //The camera is producing video at 720p and 30fps, but we can't store all of that
-  //we're going to down-sample by a factor of 4 in both dimensions
-  //so we have 320 by 180.  this is kinda a bummer, but we'll fix it
-  //in future weeks by using off-chip DRAM.
-  //even with the down-sample, because our camera is producing data at 30fps
-  //and  our display is running at 720p at 60 fps, there's no hope to have the
-  //production and consumption of information be synchronized in this system.
-  //even if we could line it up once, the clocks of both systems will drift over time
-  //so to avoid this sync issue, we use a conflict-resolution device...the frame buffer
-  //instead we use a frame buffer as a go-between. The camera sends pixels in at
-  //its own rate, and we pull them out for display at the 720p rate/requirement
-  //this avoids the whole sync issue. It will however result in artifacts when you
-  //introduce fast motion in front of the camera. These lines/tears in the image
-  //are the result of unsynced frame-rewriting happening while displaying. It won't
-  //matter for slow movement
-  localparam FB_DEPTH = 320 * 180;
-  localparam FB_SIZE = $clog2(FB_DEPTH);
-  logic [FB_SIZE-1:0] addra;  //used to specify address to write in to frame buffer
-
-  logic               valid_camera_mem;  //used to enable writing pixel data to frame buffer
-  logic [       15:0] camera_mem;  //used to pass pixel data into frame buffer
-
-
-  //TODO: copy in your subsampling logic from week 5. Used only for the old BRAM way of viewing
-  always_ff @(posedge clk_camera) begin
-    // you already wrote this!
-    if (camera_valid && camera_hcount[1:0] == 2'b0 && camera_vcount[1:0] == 2'b0) begin
-      camera_mem <= camera_pixel;
-      valid_camera_mem <= 1;
-      addra = (camera_hcount >> 2) + (camera_vcount >> 2) * 320;
-    end else valid_camera_mem <= 0;
-  end
-
-  //frame buffer from IP
-  blk_mem_gen_0 frame_buffer (
-      .addra(addra),  //pixels are stored using this math
-      .clka(clk_camera),
-      .wea(valid_camera_mem),
-      .dina(camera_mem),
-      .ena(1'b1),
-      .douta(),  //never read from this side
-      .addrb(addrb),  //transformed lookup pixel
-      .dinb(16'b0),
-      .clkb(clk_pixel),
-      .web(1'b0),
-      .enb(1'b1),
-      .doutb(frame_buff_bram)
+  binning_2 binner (
+      .clk_in(clk_camera),
+      .rst_in(sys_rst_camera),
+      .hcount_in(camera_hcount),
+      .vcount_in(camera_vcount),
+      .pixel_data_in(camera_pixel),
+      .data_valid_in(camera_valid),
+      .pixel_out(binner_pixel),
+      .hcount_out(binner_hcount),
+      .vcount_out(binner_vcount),
+      .data_valid_out(binner_valid)
   );
 
-  logic [FB_SIZE-1:0] addrb;  //used to lookup address in memory for reading from buffer
-  logic               good_addrb;  //used to indicate within valid frame for scaling
-  //TODO: scale logic! copy in only the 4X zoom logic from last week! Maybe remove the flip (aka the 319-hcount) logic and replace it with just hcount.
-  always_ff @(posedge clk_pixel) begin
-    //you already wrote this!
-    addrb <= (hcount_hdmi >> 2) + 320 * (vcount_hdmi >> 2);
-    good_addrb <= (hcount_hdmi < 1280) && (vcount_hdmi < 720);
+  logic [10:0] skeleton_hcount;
+  logic [ 9:0] skeleton_vcount;
+  logic        skeleton_pixel;
+  logic        skeleton_valid;
+  logic        skeleton_busy;
+  logic        should_input_skeleton;
+
+  always_ff @(posedge clk_camera) begin
+    if (sys_rst_camera) begin
+      should_input_skeleton <= 0;
+    end else begin
+      if (!skeleton_busy && binner_hcount == 319 && binner_vcount == 179) begin
+        should_input_skeleton <= 1;
+      end else if (skeleton_busy) begin
+        should_input_skeleton <= 0;
+      end
+    end
   end
+
+  skeletonizer skeletonizer_inst (
+      .clk_in(clk_camera),
+      .rst_in(sys_rst_camera),
+      .hcount_in(binner_hcount),
+      .vcount_in(binner_vcount),
+      .pixel_in(binner_pixel),
+      .pixel_valid_in(binner_valid && should_input_skeleton),
+      .pixel_out(skeleton_pixel),
+      .pixel_valid_out(skeleton_valid),
+      .hcount_out(skeleton_hcount),
+      .vcount_out(skeleton_vcount),
+      .busy(skeleton_busy)
+  );
+
+  // TODO: store skeleton output in a frame buffer
+
+  // Frame buffer stuff (Try not to touch)
+
+  logic [ 15:0] frame_buff_dram;  // data out of DRAM frame buffer
 
   // 2. The New Way: write memory to DRAM and read it out, over a couple AXI-Stream data pipelines.
   // NEW DRAM STUFF STARTS HERE
@@ -252,8 +220,7 @@ module top_level (
       .pixel_tvalid(camera_valid),
       .pixel_tready(),
       .pixel_tdata(camera_pixel),
-      // TODO: define the tlast value! you can do it in one line, based on camera hcount/vcount values
-      .pixel_tlast(camera_hcount == 1279 && camera_vcount == 719),  // change me
+      .pixel_tlast(camera_hcount == 1279 && camera_vcount == 719),
       .chunk_tvalid(camera_axis_tvalid),
       .chunk_tready(camera_axis_tready),
       .chunk_tdata(camera_axis_tdata),
@@ -352,10 +319,6 @@ module top_level (
       .write_axis_smallpile(camera_ui_axis_prog_empty),
       .read_axis_af        (display_ui_axis_prog_full),
       .read_axis_ready     (display_ui_axis_tready)      //,
-      // Uncomment for part 2!
-      // .zoom_view_en ( zoom_view ),
-      // .zoom_view_x ( center_x_ui ),
-      // .zoom_view_y( center_y_ui )
   );
 
   // the MIG IP!
@@ -440,11 +403,9 @@ module top_level (
       .pixel_tlast(frame_buff_tlast)
   );
 
-  // TODO: assign frame_buff_tready
+  // assign frame_buff_tready
   // I did this in 1 (kind of long) line. an always_comb block could also work.
   assign frame_buff_tready = frame_buff_tlast ? (hcount_hdmi == 1279 && vcount_hdmi == 719) : active_draw_hdmi;
-  // TODO in part 2: update this tready to also only be high for odd hcount values (every other drawn pixel gets a new value)
-
 
   assign frame_buff_dram = frame_buff_tvalid ? frame_buff_tdata : 16'h2277;
 
@@ -454,9 +415,9 @@ module top_level (
   //remapped frame_buffer outputs with 8 bits for r, g, b
   logic [7:0] fb_red, fb_green, fb_blue;
   always_ff @(posedge clk_pixel) begin
-    fb_red   <= good_addrb ? {frame_buff_raw[15:11], 3'b0} : 8'b0;
-    fb_green <= good_addrb ? {frame_buff_raw[10:5], 2'b0} : 8'b0;
-    fb_blue  <= good_addrb ? {frame_buff_raw[4:0], 3'b0} : 8'b0;
+    fb_red   <= {frame_buff_dram[15:11], 3'b0};
+    fb_green <= {frame_buff_dram[10:5], 2'b0};
+    fb_blue  <= {frame_buff_dram[4:0], 3'b0};
   end
   // Pixel Processing pre-HDMI output
 
@@ -479,11 +440,6 @@ module top_level (
       .cb_out(cb_full)
   );
 
-  //channel select module (select which of six color channels to mask):
-  logic [2:0] channel_sel;
-  logic [7:0] selected_channel;  //selected channels
-  //selected_channel could contain any of the six color channels depend on selection
-
   //threshold module (apply masking threshold):
   logic [7:0] cr_cutoff;
   logic [7:0] y_cutoff;
@@ -496,29 +452,7 @@ module top_level (
   assign cr = {!cr_full[7], cr_full[6:0]};
   assign cb = {!cb_full[7], cb_full[6:0]};
 
-  assign channel_sel = sw[3:1];
-  // * 3'b000: green
-  // * 3'b001: red
-  // * 3'b010: blue
-  // * 3'b011: not valid
-  // * 3'b100: y (luminance)
-  // * 3'b101: Cr (Chroma Red)
-  // * 3'b110: Cb (Chroma Blue)
-  // * 3'b111: not valid
-  //Channel Select: Takes in the full RGB and YCrCb information and
-  // chooses one of them to output as an 8 bit value
-  channel_select mcs (
-      .sel_in(channel_sel),
-      .r_in(fb_red),
-      .g_in(fb_green),
-      .b_in(fb_blue),
-      .y_in(y),
-      .cr_in(cr),
-      .cb_in(cb),
-      .channel_out(selected_channel)
-  );
-
-  //threshold values used to determine what value  passes:
+  //threshold values used to determine what value passes:
   assign cr_cutoff = {sw[11:8], 4'b0};
   assign y_cutoff = {sw[7:6], sw[3:1], 3'b0};
   assign cb_cutoff = {sw[15:12], 4'b0};
@@ -544,100 +478,17 @@ module top_level (
   //modified version of seven segment display for showing
   // thresholds and selected channel
   // special customized version
-  lab05_ssc mssc (
+  seven_segment_display mssc (
       .clk_in(clk_pixel),
       .rst_in(sys_rst_pixel),
       .lt_in(cr_cutoff),
       .ut_in(cb_cutoff),
-      .channel_sel_in(channel_sel),
+      .y_in(y_cutoff),
       .cat_out(ss_c),
       .an_out({ss0_an, ss1_an})
   );
   assign ss0_c = ss_c;  //control upper four digit's cathodes!
   assign ss1_c = ss_c;  //same as above but for lower four digits!
-
-  //Center of Mass Calculation: (you need to do)
-  //using x_com_calc and y_com_calc values
-  //Center of Mass:
-  center_of_mass com_m (
-      .clk_in(clk_pixel),
-      .rst_in(sys_rst_pixel),
-      .x_in(hcount_hdmi),
-      .y_in(vcount_hdmi),
-      .valid_in(mask),
-      .tabulate_in((nf_hdmi)),
-      .x_out(x_com_calc),
-      .y_out(y_com_calc),
-      .valid_out(new_com)
-  );
-
-  logic [10:0] x_com_transform;
-  logic [ 9:0] y_com_transform;
-  // TODO in part 2:
-  // convert the calculated center of mass back to the original coordinate system
-  // use the current zoom_center_x and zoom_center_y to know the current view's system!
-  // this should take 2 lines.
-  always_comb begin
-    // x_com_transform = x_com_calc; // change me
-    // y_com_transform = y_com_calc; // change me
-  end
-
-  //grab logic for above
-  //update center of mass x_com, y_com based on new_com signal
-  always_ff @(posedge clk_pixel) begin
-    if (sys_rst_pixel) begin
-      x_com         <= 0;
-      y_com         <= 0;
-      zoom_center_x <= 640;
-      zoom_center_y <= 360;
-    end
-    if (new_com) begin
-      // store new long-term center of mass values.
-      if (zoom_view) begin
-        // used in part 2: convert calculated center of mass to original coordinate system
-        // use current zoom centers to determine it.
-        x_com <= x_com_transform;
-        y_com <= y_com_transform;
-      end else begin
-        // when not zoomed in, store the center of mass variables like normal
-        x_com <= x_com_calc;
-        y_com <= y_com_calc;
-      end
-
-      // update zoomed-in center: averaged value between current zoom center and new COM.
-      // this way, while we're zoomed in, the center of mass moves more smoothly!
-      if (zoom_view) begin
-        // you also might want to update this to bound where the center can go!
-        zoom_center_x <= 32'(zoom_center_x + zoom_center_x + zoom_center_x + x_com_transform) >> 2;
-        zoom_center_y <= 32'(zoom_center_y + zoom_center_y + zoom_center_y + y_com_transform) >> 2;
-      end else begin
-        zoom_center_x <= x_com;
-        zoom_center_y <= y_com;
-      end
-
-    end
-
-  end
-
-  //image_sprite output:
-  logic [7:0] img_red, img_green, img_blue;
-
-  // TODO: image sprite using hdmi hcount/vcount, x_com y_com to draw image or nothing
-  //bring in an instance of your popcat image sprite! remember the correct mem files too!
-
-
-  //crosshair output:
-  logic [7:0] ch_red, ch_green, ch_blue;
-
-  //Create Crosshair patter on center of mass:
-  //0 cycle latency
-  //TODO: Should be using output of (PS3)
-  always_comb begin
-    ch_red   = ((vcount_hdmi == y_com) || (hcount_hdmi == x_com)) ? 8'hFF : 8'h00;
-    ch_green = ((vcount_hdmi == y_com) || (hcount_hdmi == x_com)) ? 8'hFF : 8'h00;
-    ch_blue  = ((vcount_hdmi == y_com) || (hcount_hdmi == x_com)) ? 8'hFF : 8'h00;
-  end
-
 
   // HDMI video signal generator
   video_sig_gen vsg (
@@ -656,32 +507,19 @@ module top_level (
   // Video Mux: select from the different display modes based on switch values
   //used with switches for display selections
   logic [1:0] display_choice;
-  logic [1:0] target_choice;
 
   assign display_choice = sw[5:4];
-  assign target_choice  = sw[7:6];
 
   //choose what to display from the camera:
   // * 'b00:  normal camera out
-  // * 'b01:  selected channel image in grayscale
+  // * 'b01:  not implemented
   // * 'b10:  masked pixel (all on if 1, all off if 0)
-  // * 'b11:  chroma channel with mask overtop as magenta
-  //
-  //then choose what to use with center of mass:
-  // * 'b00: nothing
-  // * 'b01: crosshair
-  // * 'b10: sprite on top
-  // * 'b11: nothing
+  // * 'b11:  normal output with mask overtop as magenta
 
   video_mux mvm (
       .bg_in(display_choice),  //choose background
-      .target_in(target_choice),  //choose target
       .camera_pixel_in({fb_red, fb_green, fb_blue}),
-      .camera_y_in(y),  //luminance 
-      .channel_in(selected_channel),  //current channel being drawn 
       .thresholded_pixel_in(mask),  //one bit mask signal
-      .crosshair_in({ch_red, ch_green, ch_blue}),
-      .com_sprite_pixel_in({img_red, img_green, img_blue}),
       .pixel_out({red, green, blue})  //output to tmds
   );
 
