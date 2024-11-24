@@ -23,7 +23,7 @@ module binning_2 #(
 );
   localparam int HWIDTH = $clog2(HRES);
   localparam int VWIDTH = $clog2(VRES);
-  localparam int LOG_MAX_COUNT = $clog2(KERNEL_SIZE * KERNEL_SIZE);
+  localparam int LOG_MAX_COUNT = $clog2(KERNEL_SIZE * KERNEL_SIZE + 1);
 
   logic [KERNEL_SIZE-1:0] weebs;
   logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] pixel_outs;
@@ -47,7 +47,7 @@ module binning_2 #(
 
   always_ff @(posedge clk_in) begin
     if (rst_in) begin
-      weebs <= 1'b1 << (KERNEL_SIZE-1);
+      weebs <= 1'b1 << (KERNEL_SIZE - 1);
       mask_count <= 0;
       data_valid_out <= 1'b0;
       data_valid_in_pipe <= 1'b0;
@@ -58,7 +58,7 @@ module binning_2 #(
         vcount_in_pipe <= vcount_in;
         hcount_out <= hcount_in_pipe[HWIDTH-1:2];
         vcount_out <= vcount_shifted[VWIDTH-1:2];
-        
+
         case (weebs)
           4'b1000: begin
             if (hcount_in[1:0] == 2'b10) begin
@@ -70,7 +70,7 @@ module binning_2 #(
               mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in;
             end
           end
-          
+
           default: begin
           end
         endcase

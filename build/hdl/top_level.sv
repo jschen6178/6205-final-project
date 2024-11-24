@@ -423,10 +423,10 @@ module top_level (
   logic        binner_valid;
 
   binning_2 binner (
-      .clk_in(clk_camera),
+      .clk_in(clk_pixel),
       .rst_in(sys_rst_camera),
-      .hcount_in(camera_hcount),
-      .vcount_in(camera_vcount),
+      .hcount_in(hcount_hdmi),
+      .vcount_in(vcount_hdmi),
       .pixel_data_in(mask),
       .data_valid_in(camera_valid),
       .pixel_data_out(binner_pixel),
@@ -455,7 +455,7 @@ module top_level (
   end
 
   skeletonizer skeletonizer_inst (
-      .clk_in(clk_camera),
+      .clk_in(clk_pixel),
       .rst_in(sys_rst_camera),
       .hcount_in(binner_hcount),
       .vcount_in(binner_vcount),
@@ -468,13 +468,37 @@ module top_level (
       .busy(skeleton_busy)
   );
 
+  logic skeleton_buf_out;
+
   // TODO: store skeleton output in a frame buffer
+  xilinx_true_dual_port_read_first_2_clock_ram #(
+      .RAM_WIDTH(1),  // Specify RAM data width
+      .RAM_DEPTH(320 * 180),  // Specify RAM depth (number of entries)
+      .RAM_PERFORMANCE("HIGH_PERFORMANCE")
+  ) skeleton_frame_buffer (
+      .addra(sw[0] ? skeleton_vcount * 320 + skeleton_hcount : binner_vcount * 320 + binner_hcount),  // Port A address bus, width determined from RAM_DEPTH
+      .addrb(vcount_hdmi[9:2] * 320 + hcount_hdmi[10:2]),  // Port B address bus, width determined from RAM_DEPTH
+      .dina(sw[0] ? skeleton_pixel : binner_pixel),  // Port A RAM input data, width determined from RAM_WIDTH
+      .dinb(),  // Port B RAM input data, width determined from RAM_WIDTH
+      .clka(clk_pixel),  // Port A clock
+      .clkb(clk_pixel),  // Port B clock
+      .wea(skeleton_valid),  // Port A write enable
+      .web(0),  // Port B write enable
+      .ena(1'b1),  // Port A RAM Enable, for additional power savings, disable port when not in use
+      .enb(1'b1),  // Port B RAM Enable, for additional power savings, disable port when not in use
+      .rsta(sys_rst_pixel),  // Port A output reset (does not affect memory contents)
+      .rstb(sys_rst_pixel),  // Port B output reset (does not affect memory contents)
+      .regcea(1'b1),  // Port A output register enable
+      .regceb(1'b1),  // Port B output register enable
+      .douta(),  // Port A RAM output data, width determined from RAM_WIDTH
+      .doutb(skeleton_buf_out)  // Port B RAM output data, width determined from RAM_WIDTH
+  );
 
   // Frame buffer stuff (Try not to touch)
 
-  logic [ 15:0] frame_buff_dram;  // data out of DRAM frame buffer
+  logic [15:0] frame_buff_dram;  // data out of DRAM frame buffer
 
-  logic [6:0] ss_c;
+  logic [ 6:0] ss_c;
   //modified version of seven segment display for showing
   // thresholds and selected channel
   // special customized version
@@ -518,7 +542,7 @@ module top_level (
 
   video_mux mvm (
       .bg_in(display_choice),  //choose background
-      .bin_in(binner_pixel),
+      .bin_in(sw[4] ? binner_pixel : skeleton_buf_out),
       .camera_pixel_in({fb_red, fb_green, fb_blue}),
       .thresholded_pixel_in(mask),  //one bit mask signal
       .pixel_out({red, green, blue})  //output to tmds
