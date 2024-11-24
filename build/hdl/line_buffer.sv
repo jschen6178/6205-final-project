@@ -15,8 +15,8 @@ module line_buffer #(
     input wire data_valid_in,  //incoming  valid data signal
 
     output logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] line_buffer_out,  //output pixels of data
-    output logic [HWIDTH-1:0] hcount_out,  //current hcount being read
-    output logic [VWIDTH-1:0] vcount_out,  //current vcount being read
+    output logic [HWIDTH-3:0] hcount_out,  //current hcount being read, binned down 4x
+    output logic [VWIDTH-3:0] vcount_out,  //current vcount being read, binned down 4x
     output logic data_valid_out  //valid data out signal
 );
   localparam int HWIDTH = $clog2(HRES);

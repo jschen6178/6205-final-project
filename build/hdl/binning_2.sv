@@ -1,5 +1,7 @@
 `default_nettype none
 
+// what is happening is we are using 4 line buffers, and when we are writing to the 4th line buffer we 
+// will start counting
 module binning_2 #(
     parameter int HRES = 1280,
     parameter int VRES = 720,
@@ -14,16 +16,18 @@ module binning_2 #(
     input wire [DATA_WIDTH-1:0] pixel_data_in,  //incoming pixel
     input wire data_valid_in,  //incoming  valid data signal
 
-    output logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] line_buffer_out,  //output pixels of data
-    output logic [HWIDTH-1:0] hcount_out,  //current hcount being read
-    output logic [VWIDTH-1:0] vcount_out,  //current vcount being read
+    output logic pixel_data_out,  //output pixel of data
+    output logic [HWIDTH-3:0] hcount_out,  //current hcount being read
+    output logic [VWIDTH-3:0] vcount_out,  //current vcount being read
     output logic data_valid_out  //valid data out signal
 );
   localparam int HWIDTH = $clog2(HRES);
   localparam int VWIDTH = $clog2(VRES);
+  localparam int LOG_MAX_COUNT = $clog2(KERNEL_SIZE * KERNEL_SIZE);
 
-  logic [KERNEL_SIZE:0] weebs;
-  logic [KERNEL_SIZE:0][DATA_WIDTH-1:0] pixel_outs;
+  logic [KERNEL_SIZE-1:0] weebs;
+  logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] pixel_outs;
+  logic [LOG_MAX_COUNT] mask_count;
 
   logic data_valid_in_pipe;
   logic [HWIDTH-1:0] hcount_in_pipe;
@@ -51,35 +55,22 @@ module binning_2 #(
       if (data_valid_in_pipe) begin
         hcount_in_pipe <= hcount_in;
         vcount_in_pipe <= vcount_in;
-        hcount_out <= hcount_in_pipe;
-        vcount_out <= vcount_shifted;
-        data_valid_out <= 1'b1;
+        hcount_out <= hcount_in_pipe[HWIDTH-1:2];
+        vcount_out <= vcount_shifted[VWIDTH-1:2];
+        
         case (weebs)
           4'b1000: begin
-            line_buffer_out[0] <= pixel_outs[0];
-            line_buffer_out[1] <= pixel_outs[1];
-            line_buffer_out[2] <= pixel_outs[2];
+            if (hcount_in[1:0] == 2'b10) begin
+              data_valid_out <= 1'b1;
+              pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in) > 8 ? 1 : 0;
+              mask_count <= 0;
+            end else begin
+              data_valid_out <= 0;
+              mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in;
+            end
           end
-          4'b0001: begin
-            line_buffer_out[0] <= pixel_outs[1];
-            line_buffer_out[1] <= pixel_outs[2];
-            line_buffer_out[2] <= pixel_outs[3];
-          end
-          4'b0010: begin
-            line_buffer_out[0] <= pixel_outs[2];
-            line_buffer_out[1] <= pixel_outs[3];
-            line_buffer_out[2] <= pixel_outs[0];
-          end
-          4'b0100: begin
-            line_buffer_out[0] <= pixel_outs[3];
-            line_buffer_out[1] <= pixel_outs[0];
-            line_buffer_out[2] <= pixel_outs[1];
-          end
+          
           default: begin
-            // For debugging
-            line_buffer_out[0] <= 16'h000F;
-            line_buffer_out[1] <= 16'h00F0;
-            line_buffer_out[2] <= 16'h0F00;
           end
         endcase
         if (vcount_in != vcount_in_pipe) begin
@@ -96,7 +87,7 @@ module binning_2 #(
   // buffer incoming data from the wire:
   generate
     genvar i;
-    for (i = 0; i < KERNEL_SIZE + 1; i = i + 1) begin
+    for (i = 0; i < KERNEL_SIZE; i = i + 1) begin
       xilinx_true_dual_port_read_first_1_clock_ram #(
           .RAM_WIDTH(DATA_WIDTH),
           .RAM_DEPTH(HRES),
