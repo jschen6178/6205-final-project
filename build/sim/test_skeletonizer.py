@@ -15,6 +15,27 @@ from cocotb.runner import get_runner
 MODULE_NAME = "skeletonizer"
 
 
+image_str = """
+0000000000000000
+0000000000000000
+0000111111100000
+0001111111110000
+0011111001111000
+0011110000111000
+0011110000111000
+0011110000111000
+0011110000111000
+0011110000111000
+0011110000111000
+0011110000111000
+0001110000000000
+0000000000000000
+0000000000000000
+0000000000000000
+"""
+image = [[int(c) for c in line] for line in image_str.strip().split("\n")]
+
+
 @cocotb.test
 async def test_a(dut):
     dut._log.info("Starting...")
@@ -31,7 +52,7 @@ async def test_a(dut):
             for j in range(16):
                 dut.hcount_in.value = j
                 dut.vcount_in.value = i
-                dut.pixel_in.value = 1 if 2 <= i <= 4 and 2 <= j <= 5 else 0
+                dut.pixel_in.value = image[i][j]
                 dut.pixel_valid_in.value = 1
                 await ClockCycles(dut.clk_in, 1)
             dut.pixel_valid_in.value = 0

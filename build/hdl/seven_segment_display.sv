@@ -3,13 +3,12 @@
 module seven_segment_display #(
     parameter COUNT_TO = 100000
 ) (
-    input  wire        clk_in,
-    input  wire        rst_in,
-    input  wire  [7:0] lt_in,
-    input  wire  [7:0] ut_in,
-    input  wire  [7:0] y_in,
-    output logic [6:0] cat_out,
-    output logic [7:0] an_out
+    input  wire         clk_in,
+    input  wire         rst_in,
+    input  wire  [31:0] bin_in,
+    input  wire  [ 7:0] enable_in,
+    output logic [ 6:0] cat_out,
+    output logic [ 7:0] an_out
 );
 
   logic [ 7:0] segment_state;
@@ -23,28 +22,28 @@ module seven_segment_display #(
 
   always_comb begin
     case (segment_state)
-      8'b0000_0001: led_out = bto7s_led_out;
-      8'b0000_0010: led_out = bto7s_led_out;
-      8'b0000_0100: led_out = 7'b0000000;
-      8'b0000_1000: led_out = bto7s_led_out;
-      8'b0001_0000: led_out = bto7s_led_out;
-      8'b0010_0000: led_out = 7'b0000000;
-      8'b0100_0000: led_out = bto7s_led_out;
-      8'b1000_0000: led_out = bto7s_led_out;
+      8'b0000_0001: led_out = enable_in[0] ? bto7s_led_out : 7'b0000000;
+      8'b0000_0010: led_out = enable_in[1] ? bto7s_led_out : 7'b0000000;
+      8'b0000_0100: led_out = enable_in[2] ? bto7s_led_out : 7'b0000000;
+      8'b0000_1000: led_out = enable_in[3] ? bto7s_led_out : 7'b0000000;
+      8'b0001_0000: led_out = enable_in[4] ? bto7s_led_out : 7'b0000000;
+      8'b0010_0000: led_out = enable_in[5] ? bto7s_led_out : 7'b0000000;
+      8'b0100_0000: led_out = enable_in[6] ? bto7s_led_out : 7'b0000000;
+      8'b1000_0000: led_out = enable_in[7] ? bto7s_led_out : 7'b0000000;
       default:      led_out = 7'b0000000;
     endcase
   end
 
   always_comb begin
     case (segment_state)
-      8'b0000_0001: routed_vals = y_in[3:0];
-      8'b0000_0010: routed_vals = y_in[7:4];
-      8'b0000_0100: routed_vals = 4'b0;
-      8'b0000_1000: routed_vals = lt_in[3:0];
-      8'b0001_0000: routed_vals = lt_in[7:4];
-      8'b0010_0000: routed_vals = 4'b0;
-      8'b0100_0000: routed_vals = ut_in[3:0];
-      8'b1000_0000: routed_vals = ut_in[7:4];
+      8'b0000_0001: routed_vals = bin_in[3:0];
+      8'b0000_0010: routed_vals = bin_in[7:4];
+      8'b0000_0100: routed_vals = bin_in[11:8];
+      8'b0000_1000: routed_vals = bin_in[15:12];
+      8'b0001_0000: routed_vals = bin_in[19:16];
+      8'b0010_0000: routed_vals = bin_in[23:20];
+      8'b0100_0000: routed_vals = bin_in[27:24];
+      8'b1000_0000: routed_vals = bin_in[31:28];
       default:      routed_vals = 4'b0;
     endcase
   end
@@ -69,56 +68,6 @@ module seven_segment_display #(
     end
   end
 endmodule  //seven_segment_controller
-
-module bto7s (
-    input  wire  [3:0] x_in,
-    output logic [6:0] s_out
-);
-  logic sa, sb, sc, sd, se, sf, sg;
-  assign s_out = {sg, sf, se, sd, sc, sb, sa};
-
-  // array of bits that are "one hot" with numbers 0 through 15
-  logic [15:0] num;
-
-  assign num[0] = ~x_in[3] && ~x_in[2] && ~x_in[1] && ~x_in[0];
-  assign num[1] = ~x_in[3] && ~x_in[2] && ~x_in[1] && x_in[0];
-  assign num[2] = x_in == 4'd2;
-  assign num[3] = x_in == 4'd3;
-  assign num[4] = x_in == 4'd4;
-  assign num[5] = x_in == 4'd5;
-  assign num[6] = x_in == 4'd6;
-  assign num[7] = x_in == 4'd7;
-  assign num[8] = x_in == 4'd8;
-  assign num[9] = x_in == 4'd9;
-  assign num[10] = x_in == 4'd10;
-  assign num[11] = x_in == 4'd11;
-  assign num[12] = x_in == 4'd12;
-  assign num[13] = x_in == 4'd13;
-  assign num[14] = x_in == 4'd14;
-  assign num[15] = x_in == 4'd15;
-
-  /* you could also do this with generation, like this:
-         *
-         * genvar i;
-         * generate
-         * for (i=0; i<16; i=i+1)begin
-         *     assign num[i] = (x_in == i);
-         * end
-         * endgenerate
-         */
-
-  /* assign the seven output segments, sa through sg, using a "sum of products"
-         * approach and the diagram above.
-         */
-
-  assign sa = num[0] || num[2] || num[3] || num[5] || num[6] || num[7] || num[8] || num[9] || num[10] || num[12] ||num[14] ||num[15];
-  assign sb = num[0] || num[1] || num[2] || num[3] || num[4] || num[7] || num[8] || num[9] || num[10] || num[13];
-  assign sc = num[0] || num[1] || num[3] || num[4] || num[5] || num[6] || num[7] || num[8] || num[9] || num[10] || num[11] || num[13];
-  assign sd = num[0] || num[2] || num[3] || num[5] || num[6] || num[8] || num[9] || num[11] || num[12] || num[13] || num[14];
-  assign se = num[0] || num[2] || num[6] || num[8] || num[10] || num[11] || num[12] || num[13] || num[14] || num[15];
-  assign sf = num[0] || num[4] || num[5] || num[6] || num[8] || num[9] || num[10] || num[11] || num[12] || num[14] || num[15];
-  assign sg = num[2] || num[3] || num[4] || num[5] || num[6] || num[8] || num[9] || num[10] || num[11] || num[13] || num[14] ||num[15];
-endmodule
 
 
 `default_nettype wire

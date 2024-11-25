@@ -460,7 +460,7 @@ module top_level (
       .hcount_in(binner_hcount),
       .vcount_in(binner_vcount),
       .pixel_in(binner_pixel),
-      .pixel_valid_in(binner_valid && should_input_skeleton),
+      .pixel_valid_in(sw[0] && binner_valid && should_input_skeleton),
       .skeleton_out(skeleton_pixel),
       .pixel_valid_out(skeleton_valid),
       .hcount_out(skeleton_hcount),
@@ -505,9 +505,21 @@ module top_level (
   seven_segment_display mssc (
       .clk_in(clk_pixel),
       .rst_in(sys_rst_pixel),
-      .lt_in(cr_cutoff),
-      .ut_in(cb_cutoff),
-      .y_in(y_cutoff),
+      // .bin_in({y_cutoff, 4'b0, cr_cutoff, 4'b0, cb_cutoff}),
+      .bin_in({
+        3'b0,
+        should_input_skeleton,
+        3'b0,
+        skeleton_busy,
+        3'b0,
+        skeleton_pixel,
+        3'b0,
+        skeleton_valid,
+        skeleton_hcount[10:7],
+        skeleton_vcount[9:6],
+        8'b0
+      }),
+      .enable_in(8'b11111100),
       .cat_out(ss_c),
       .an_out({ss0_an, ss1_an})
   );

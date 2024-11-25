@@ -64,9 +64,9 @@ module skeletonizer #(
                   + (!line_buffer_buf[2][2] & line_buffer_buf[2][1]) + (!line_buffer_buf[2][1] & line_buffer_buf[2][0])
                   + (!line_buffer_buf[2][0] & line_buffer_buf[1][0]) + (!line_buffer_buf[1][0] & line_buffer_buf[0][0]);
         if (count_b >= 2 && count_b <= 6 && count_a == 1 &&
-            (iter_parity && !(line_buffer_buf[0][1] & line_buffer_buf[1][2] & line_buffer_buf[2][1])
-                         && !(line_buffer_buf[0][1] & line_buffer_buf[2][1] & line_buffer_buf[1][0])
-            || !iter_parity && !(line_buffer_buf[0][1] & line_buffer_buf[1][2] & line_buffer_buf[1][0])
+            (!iter_parity && !(line_buffer_buf[0][1] & line_buffer_buf[1][2] & line_buffer_buf[2][1])
+                         && !(line_buffer_buf[1][2] & line_buffer_buf[2][1] & line_buffer_buf[1][0])
+            || iter_parity && !(line_buffer_buf[0][1] & line_buffer_buf[1][2] & line_buffer_buf[1][0])
                             && !(line_buffer_buf[0][1] & line_buffer_buf[2][1] & line_buffer_buf[1][0]))) begin
           write_data = 0;
         end else begin
@@ -143,40 +143,36 @@ module skeletonizer #(
         end else begin
           iter_hcount <= iter_hcount + 1;
         end
-        if (write_data != line_buffer_out[1][1]) begin
+        if (write_data != line_buffer_buf[1][1]) begin
           iter_changed <= 1;
         end
       end
       if (outputting) begin
         skeleton_out <= frame_buffer_out;
-        hcount_out   <= iter_hcount;
-        vcount_out   <= iter_vcount;
-      end else begin
-        skeleton_out <= 0;
-        hcount_out   <= hcount_in;
-        vcount_out   <= vcount_in;
+        hcount_out   <= iter_hcount_pipe[1];
+        vcount_out   <= iter_vcount_pipe[1];
       end
     end
   end
 
-  logic [HWIDTH-1:0] line_buf_hcount_in_pipe[0:1];
-  logic [VWIDTH-1:0] line_buf_vcount_in_pipe[0:1];
+  logic [HWIDTH-1:0] iter_hcount_pipe[0:1];
+  logic [VWIDTH-1:0] iter_vcount_pipe[0:1];
   logic line_buf_valid_in_pipe[0:1];
 
   always_ff @(posedge clk_in) begin
     if (rst_in) begin
       for (int i = 0; i < 2; i++) begin
-        line_buf_hcount_in_pipe[i] <= 0;
-        line_buf_vcount_in_pipe[i] <= 0;
-        line_buf_valid_in_pipe[i]  <= 0;
+        iter_hcount_pipe[i] <= 0;
+        iter_vcount_pipe[i] <= 0;
+        line_buf_valid_in_pipe[i] <= 0;
       end
     end else begin
-      line_buf_hcount_in_pipe[0] <= iter_hcount;
-      line_buf_hcount_in_pipe[1] <= line_buf_hcount_in_pipe[0];
-      line_buf_vcount_in_pipe[0] <= iter_vcount;
-      line_buf_vcount_in_pipe[1] <= line_buf_vcount_in_pipe[0];
-      line_buf_valid_in_pipe[0]  <= busy;
-      line_buf_valid_in_pipe[1]  <= line_buf_valid_in_pipe[0];
+      iter_hcount_pipe[0] <= iter_hcount;
+      iter_hcount_pipe[1] <= iter_hcount_pipe[0];
+      iter_vcount_pipe[0] <= iter_vcount;
+      iter_vcount_pipe[1] <= iter_vcount_pipe[0];
+      line_buf_valid_in_pipe[0] <= busy;
+      line_buf_valid_in_pipe[1] <= line_buf_valid_in_pipe[0];
     end
   end
 
@@ -187,8 +183,8 @@ module skeletonizer #(
   ) lb (
       .clk_in(clk_in),
       .rst_in(rst_in),
-      .hcount_in(line_buf_hcount_in_pipe[1]),
-      .vcount_in(line_buf_vcount_in_pipe[1]),
+      .hcount_in(iter_hcount_pipe[1]),
+      .vcount_in(iter_vcount_pipe[1]),
       .pixel_data_in(frame_buffer_out),
       .data_valid_in(line_buf_valid_in_pipe[1]),
       .line_buffer_out(line_buffer_out),
