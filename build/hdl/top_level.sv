@@ -476,13 +476,13 @@ module top_level (
       .RAM_DEPTH(320 * 180),  // Specify RAM depth (number of entries)
       .RAM_PERFORMANCE("HIGH_PERFORMANCE")
   ) skeleton_frame_buffer (
-      .addra(sw[0] ? skeleton_vcount * 320 + skeleton_hcount : binner_vcount * 320 + binner_hcount),  // Port A address bus, width determined from RAM_DEPTH
+      .addra(sw[0] ? (skeleton_vcount * 320 + skeleton_hcount) : (binner_vcount * 320 + binner_hcount)),  // Port A address bus, width determined from RAM_DEPTH
       .addrb(vcount_hdmi[9:2] * 320 + hcount_hdmi[10:2]),  // Port B address bus, width determined from RAM_DEPTH
       .dina(sw[0] ? skeleton_pixel : binner_pixel),  // Port A RAM input data, width determined from RAM_WIDTH
       .dinb(),  // Port B RAM input data, width determined from RAM_WIDTH
       .clka(clk_pixel),  // Port A clock
       .clkb(clk_pixel),  // Port B clock
-      .wea(skeleton_valid),  // Port A write enable
+      .wea(sw[0] ? skeleton_valid : binner_valid),  // Port A write enable
       .web(0),  // Port B write enable
       .ena(1'b1),  // Port A RAM Enable, for additional power savings, disable port when not in use
       .enb(1'b1),  // Port B RAM Enable, for additional power savings, disable port when not in use

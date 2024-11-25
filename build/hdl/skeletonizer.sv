@@ -26,6 +26,7 @@ module skeletonizer #(
   logic iter_parity;
   logic [ADDR_WIDTH-1:0] write_addr;
   logic write_data;
+  logic iter_wea;
   logic frame_buffer_out;
 
   logic [2:0][0:0] line_buffer_out;
@@ -33,18 +34,26 @@ module skeletonizer #(
   logic [HWIDTH-1:0] line_buffer_hcount;
   logic [VWIDTH-1:0] line_buffer_vcount;
   logic line_buffer_valid;
-  logic [HWIDTH-1:0] line_buf_hcount_pipe;
-  logic [VWIDTH-1:0] line_buf_vcount_pipe;
+  logic [HWIDTH-1:0] line_buf_hcount_pipe[0:1];
+  logic [VWIDTH-1:0] line_buf_vcount_pipe[0:1];
+  logic line_buf_valid_pipe[0:1];
+
+  logic [2:0] debug1, debug2, debug3;
+  assign debug1 = line_buffer_buf[0];
+  assign debug2 = line_buffer_buf[1];
+  assign debug3 = line_buffer_buf[2];
 
   logic outputting;
 
   logic [3:0] count_a, count_b;
+
   always_comb begin
     if (outputting) begin
+      iter_wea = 0;
     end else if (busy) begin
-      write_addr = line_buf_vcount_pipe * HORIZONTAL_COUNT + line_buf_hcount_pipe;
-      if (line_buf_hcount_pipe == 0 || line_buf_hcount_pipe == HORIZONTAL_COUNT - 1 ||
-          line_buf_vcount_pipe == 0 || line_buf_vcount_pipe == VERTICAL_COUNT - 1) begin
+      write_addr = line_buf_vcount_pipe[1] * HORIZONTAL_COUNT + line_buf_hcount_pipe[1];
+      if (line_buf_hcount_pipe[1] == 0 || line_buf_hcount_pipe[1] == HORIZONTAL_COUNT - 1 ||
+          line_buf_vcount_pipe[1] == 0 || line_buf_vcount_pipe[1] == VERTICAL_COUNT - 1) begin
         write_data = 0;
       end else begin
         count_b = line_buffer_buf[0][0] + line_buffer_buf[0][1] + line_buffer_buf[0][2]
@@ -64,6 +73,7 @@ module skeletonizer #(
           write_data = line_buffer_buf[1][1];
         end
       end
+      iter_wea = line_buf_valid_pipe[1];
     end else begin
       write_addr = vcount_in * HORIZONTAL_COUNT + hcount_in;
       write_data = pixel_in;
@@ -81,14 +91,29 @@ module skeletonizer #(
       iter_changed <= 0;
       iter_parity <= 0;
       outputting <= 0;
+      line_buffer_buf[0] <= 0;
+      line_buffer_buf[1] <= 0;
+      line_buffer_buf[2] <= 0;
+      line_buf_hcount_pipe[0] <= 0;
+      line_buf_hcount_pipe[1] <= 0;
+      line_buf_vcount_pipe[0] <= 0;
+      line_buf_vcount_pipe[1] <= 0;
+      line_buf_valid_pipe[0] <= 0;
+      line_buf_valid_pipe[1] <= 0;
+      iter_wea <= 0;
     end else begin
       if (line_buffer_valid) begin
-        line_buffer_buf[0]   <= line_buffer_buf[1];
-        line_buffer_buf[1]   <= line_buffer_buf[2];
-        line_buffer_buf[2]   <= line_buffer_out;
-        line_buf_hcount_pipe <= line_buffer_hcount;
-        line_buf_vcount_pipe <= line_buffer_vcount;
+        line_buffer_buf[0] <= line_buffer_buf[1];
+        line_buffer_buf[1] <= line_buffer_buf[2];
+        line_buffer_buf[2] <= line_buffer_out;
+        line_buf_hcount_pipe[0] <= line_buffer_hcount;
+        line_buf_hcount_pipe[1] <= line_buf_hcount_pipe[0];
+        line_buf_vcount_pipe[0] <= line_buffer_vcount;
+        line_buf_vcount_pipe[1] <= line_buf_vcount_pipe[0];
       end
+      line_buf_valid_pipe[0] <= line_buffer_valid;
+      line_buf_valid_pipe[1] <= line_buf_valid_pipe[0];
+
       if (!busy && pixel_valid_in &&
           hcount_in == HORIZONTAL_COUNT - 1 && vcount_in == VERTICAL_COUNT - 1) begin
         busy <= 1;
@@ -107,16 +132,19 @@ module skeletonizer #(
             end else if (!iter_changed) begin
               outputting <= 1;
             end else begin
-              iter_vcount  <= 0;
               iter_parity  <= ~iter_parity;
               iter_changed <= 0;
             end
+            iter_vcount <= 0;
           end else begin
             iter_vcount <= iter_vcount + 1;
           end
           iter_hcount <= 0;
         end else begin
           iter_hcount <= iter_hcount + 1;
+        end
+        if (write_data != line_buffer_out[1][1]) begin
+          iter_changed <= 1;
         end
       end
       if (outputting) begin
@@ -131,6 +159,27 @@ module skeletonizer #(
     end
   end
 
+  logic [HWIDTH-1:0] line_buf_hcount_in_pipe[0:1];
+  logic [VWIDTH-1:0] line_buf_vcount_in_pipe[0:1];
+  logic line_buf_valid_in_pipe[0:1];
+
+  always_ff @(posedge clk_in) begin
+    if (rst_in) begin
+      for (int i = 0; i < 2; i++) begin
+        line_buf_hcount_in_pipe[i] <= 0;
+        line_buf_vcount_in_pipe[i] <= 0;
+        line_buf_valid_in_pipe[i]  <= 0;
+      end
+    end else begin
+      line_buf_hcount_in_pipe[0] <= iter_hcount;
+      line_buf_hcount_in_pipe[1] <= line_buf_hcount_in_pipe[0];
+      line_buf_vcount_in_pipe[0] <= iter_vcount;
+      line_buf_vcount_in_pipe[1] <= line_buf_vcount_in_pipe[0];
+      line_buf_valid_in_pipe[0]  <= busy;
+      line_buf_valid_in_pipe[1]  <= line_buf_valid_in_pipe[0];
+    end
+  end
+
   line_buffer #(
       .HRES(HORIZONTAL_COUNT),
       .VRES(VERTICAL_COUNT),
@@ -138,10 +187,10 @@ module skeletonizer #(
   ) lb (
       .clk_in(clk_in),
       .rst_in(rst_in),
-      .hcount_in(iter_hcount),
-      .vcount_in(iter_vcount),
+      .hcount_in(line_buf_hcount_in_pipe[1]),
+      .vcount_in(line_buf_vcount_in_pipe[1]),
       .pixel_data_in(frame_buffer_out),
-      .data_valid_in(busy),
+      .data_valid_in(line_buf_valid_in_pipe[1]),
       .line_buffer_out(line_buffer_out),
       .hcount_out(line_buffer_hcount),
       .vcount_out(line_buffer_vcount),
@@ -157,7 +206,7 @@ module skeletonizer #(
       //writing port:
       .addra(write_addr),  // Port A address bus,
       .dina(write_data),  // Port A RAM input data
-      .wea(busy || pixel_valid_in),  // Port A write enable
+      .wea(iter_wea || pixel_valid_in),  // Port A write enable
       //reading port:
       .addrb(iter_vcount * HORIZONTAL_COUNT + iter_hcount),  // Port B address bus,
       .doutb(frame_buffer_out),  // Port B RAM output data,
