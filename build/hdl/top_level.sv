@@ -424,11 +424,11 @@ module top_level (
 
   binning_2 binner (
       .clk_in(clk_pixel),
-      .rst_in(sys_rst_camera),
+      .rst_in(sys_rst_pixel),
       .hcount_in(hcount_hdmi),
       .vcount_in(vcount_hdmi),
       .pixel_data_in(mask),
-      .data_valid_in(camera_valid),
+      .data_valid_in(frame_buff_tvalid),
       .pixel_data_out(binner_pixel),
       .hcount_out(binner_hcount),
       .vcount_out(binner_vcount),
@@ -456,7 +456,7 @@ module top_level (
 
   skeletonizer skeletonizer_inst (
       .clk_in(clk_pixel),
-      .rst_in(sys_rst_camera),
+      .rst_in(sys_rst_pixel),
       .hcount_in(binner_hcount),
       .vcount_in(binner_vcount),
       .pixel_in(binner_pixel),
