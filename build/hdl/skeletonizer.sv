@@ -154,6 +154,7 @@ module skeletonizer #(
           if (iter_vcount == VERTICAL_COUNT - 1) begin
             if (outputting) begin
               busy <= 0;
+              outputting <= 0;
             end else if (!iter_changed) begin
               outputting <= 1;
             end else begin
@@ -174,15 +175,11 @@ module skeletonizer #(
       end
       outputting_pipe[0] <= outputting;
       outputting_pipe[1] <= outputting_pipe[0];
-      if (outputting) begin
+      if (outputting_pipe[1]) begin
         skeleton_out <= frame_buffer_out;
         hcount_out <= iter_hcount_pipe[1];
         vcount_out <= iter_vcount_pipe[1];
         pixel_valid_out <= outputting_pipe[1];
-        if (iter_vcount_pipe[1] == VERTICAL_COUNT - 1 &&
-            iter_hcount_pipe[1] == HORIZONTAL_COUNT - 1 && outputting_pipe[1]) begin
-          outputting <= 0;
-        end
       end else begin
         pixel_valid_out <= 0;
       end
@@ -237,7 +234,7 @@ module skeletonizer #(
       //writing port:
       .addra(write_addr),  // Port A address bus,
       .dina(write_data),  // Port A RAM input data
-      .wea(iter_wea || pixel_valid_in),  // Port A write enable
+      .wea(iter_wea),  // Port A write enable
       //reading port:
       .addrb(iter_vcount * HORIZONTAL_COUNT + iter_hcount),  // Port B address bus,
       .doutb(frame_buffer_out),  // Port B RAM output data,

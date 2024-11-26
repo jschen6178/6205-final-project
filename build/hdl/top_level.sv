@@ -417,10 +417,10 @@ module top_level (
 
   // Skeletonization logic
 
-  logic [10:0] binner_hcount;
-  logic [ 9:0] binner_vcount;
-  logic        binner_pixel;
-  logic        binner_valid;
+  logic [8:0] binner_hcount;
+  logic [7:0] binner_vcount;
+  logic       binner_pixel;
+  logic       binner_valid;
 
   binning_2 binner (
       .clk_in(clk_pixel),
@@ -435,12 +435,12 @@ module top_level (
       .data_valid_out(binner_valid)
   );
 
-  logic [10:0] skeleton_hcount;
-  logic [ 9:0] skeleton_vcount;
-  logic        skeleton_pixel;
-  logic        skeleton_valid;
-  logic        skeleton_busy;
-  logic        should_input_skeleton;
+  logic [8:0] skeleton_hcount;
+  logic [7:0] skeleton_vcount;
+  logic       skeleton_pixel;
+  logic       skeleton_valid;
+  logic       skeleton_busy;
+  logic       should_input_skeleton;
 
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) begin
@@ -515,8 +515,8 @@ module top_level (
         skeleton_pixel,
         3'b0,
         skeleton_valid,
-        skeleton_hcount[10:7],
-        skeleton_vcount[9:6],
+        skeleton_hcount[8:5],
+        skeleton_vcount[7:4],
         8'b0
       }),
       .enable_in(8'b11111100),
@@ -554,7 +554,7 @@ module top_level (
 
   video_mux mvm (
       .bg_in(display_choice),  //choose background
-      .bin_in(sw[4] ? binner_pixel : skeleton_buf_out),
+      .bin_in(sw[4] ? (sw[0] ? skeleton_pixel & skeleton_valid : binner_pixel & binner_valid) : skeleton_buf_out),
       .camera_pixel_in({fb_red, fb_green, fb_blue}),
       .thresholded_pixel_in(mask),  //one bit mask signal
       .pixel_out({red, green, blue})  //output to tmds
