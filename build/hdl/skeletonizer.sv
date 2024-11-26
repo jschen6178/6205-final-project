@@ -30,10 +30,10 @@ module skeletonizer #(
   logic iter_wea;
   logic frame_buffer_out;
 
-// uses a line_buffer module to get 3 lines read at a time
-// need a 3x3 sqaure to compute neighbors and such, this is stored in line_buffer_buf
-// 
-// the paritcular pixel we want to analyze has line_buffer_hcount/vcount
+  // uses a line_buffer module to get 3 lines read at a time
+  // need a 3x3 sqaure to compute neighbors and such, this is stored in line_buffer_buf
+  //
+  // the paritcular pixel we want to analyze has line_buffer_hcount/vcount
 
   logic [2:0][0:0] line_buffer_out;
   logic [2:0] line_buffer_buf[0:2];
@@ -49,13 +49,14 @@ module skeletonizer #(
   assign debug2 = line_buffer_buf[1];
   assign debug3 = line_buffer_buf[2];
 
-  logic outputting; // outputting once algorithm is finished with last iteration
+  logic outputting;
+  logic outputting_pipe[0:1];  // outputting once algorithm is finished with last iteration
 
   logic [3:0] count_a, count_b;
 
   always_comb begin
     if (outputting) begin
-      iter_wea = 0; 
+      iter_wea = 0;
     end else if (busy) begin
       write_addr = line_buf_vcount_pipe[1] * HORIZONTAL_COUNT + line_buf_hcount_pipe[1];
       // EDGE CASES HERE -- IF PIXEL IS ON EDGE OF SCREEN WE REMOVE IT
@@ -76,12 +77,12 @@ module skeletonizer #(
 
         // count_a = number of transitions from 0 to 1 or 1 to 0 when going in a circle
         // around pixel [1][1]
-        
+
         count_a = (!line_buffer_buf[0][0] & line_buffer_buf[0][1]) + (!line_buffer_buf[0][1] & line_buffer_buf[0][2])
                   + (!line_buffer_buf[0][2] & line_buffer_buf[1][2]) + (!line_buffer_buf[1][2] & line_buffer_buf[2][2])
                   + (!line_buffer_buf[2][2] & line_buffer_buf[2][1]) + (!line_buffer_buf[2][1] & line_buffer_buf[2][0])
                   + (!line_buffer_buf[2][0] & line_buffer_buf[1][0]) + (!line_buffer_buf[1][0] & line_buffer_buf[0][0]);
-        
+
         if (count_b >= 2 && count_b <= 6 && count_a == 1 &&
             (!iter_parity && !(line_buffer_buf[0][1] & line_buffer_buf[1][2] & line_buffer_buf[2][1])
                          && !(line_buffer_buf[1][2] & line_buffer_buf[2][1] & line_buffer_buf[1][0])
@@ -92,12 +93,12 @@ module skeletonizer #(
           write_data = line_buffer_buf[1][1];
         end
       end
-      iter_wea = line_buf_valid_pipe[1]; // iter_wea changes here
+      iter_wea = line_buf_valid_pipe[1];
       // so if the piped line_buffer data is valid, we can write to the frame_buffer
-
     end else begin
       write_addr = vcount_in * HORIZONTAL_COUNT + hcount_in;
       write_data = pixel_in;
+      iter_wea   = pixel_valid_in;
     end
   end
 
@@ -121,9 +122,10 @@ module skeletonizer #(
       line_buf_vcount_pipe[1] <= 0;
       line_buf_valid_pipe[0] <= 0;
       line_buf_valid_pipe[1] <= 0;
-      iter_wea <= 0; // being assigned combinationally above, could be hazardous
+      outputting_pipe[0] <= 0;
+      outputting_pipe[1] <= 0;
     end else begin
-      if (line_buffer_valid) begin // pipeline here
+      if (line_buffer_valid) begin  // pipeline here
         line_buffer_buf[0] <= line_buffer_buf[1];
         line_buffer_buf[1] <= line_buffer_buf[2];
         line_buffer_buf[2] <= line_buffer_out;
@@ -135,6 +137,8 @@ module skeletonizer #(
       line_buf_valid_pipe[0] <= line_buffer_valid;
       line_buf_valid_pipe[1] <= line_buf_valid_pipe[0];
 
+      // If we've just inputted the last pixel of the frame, we can start
+      // iterating
       if (!busy && pixel_valid_in &&
           hcount_in == HORIZONTAL_COUNT - 1 && vcount_in == VERTICAL_COUNT - 1) begin
         busy <= 1;
@@ -143,14 +147,13 @@ module skeletonizer #(
         iter_parity <= 0;
         iter_changed <= 0;
         outputting <= 0;
-      end // what was the above for?
+      end
 
       if (busy) begin
         if (iter_hcount == HORIZONTAL_COUNT - 1) begin
           if (iter_vcount == VERTICAL_COUNT - 1) begin
             if (outputting) begin
               busy <= 0;
-              outputting <= 0;
             end else if (!iter_changed) begin
               outputting <= 1;
             end else begin
@@ -169,11 +172,17 @@ module skeletonizer #(
           iter_changed <= 1;
         end
       end
+      outputting_pipe[0] <= outputting;
+      outputting_pipe[1] <= outputting_pipe[0];
       if (outputting) begin
         skeleton_out <= frame_buffer_out;
         hcount_out <= iter_hcount_pipe[1];
         vcount_out <= iter_vcount_pipe[1];
-        pixel_valid_out <= 1;
+        pixel_valid_out <= outputting_pipe[1];
+        if (iter_vcount_pipe[1] == VERTICAL_COUNT - 1 &&
+            iter_hcount_pipe[1] == HORIZONTAL_COUNT - 1 && outputting_pipe[1]) begin
+          outputting <= 0;
+        end
       end else begin
         pixel_valid_out <= 0;
       end

@@ -37,11 +37,9 @@ module binning_2 #(
 
   always_comb begin
     if (vcount_in_pipe[1] == 0) begin
-      vcount_shifted = VRES - 2;
-    end else if (vcount_in_pipe[1] == 1) begin
       vcount_shifted = VRES - 1;
     end else begin
-      vcount_shifted = vcount_in_pipe[1] - 2;
+      vcount_shifted = vcount_in_pipe[1] - 1;
     end
   end
 
@@ -69,13 +67,13 @@ module binning_2 #(
       if (data_valid_in_pipe[1]) begin
         if (vcount_shifted[1:0] == 2'b11 && hcount_in_pipe[1][1:0] == 2'b11) begin
           data_valid_out <= 1'b1;
-          pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in) > 8 ? 1 : 0;
+          pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_outs[3]) > 8 ? 1 : 0;
           mask_count <= 0;
           hcount_out <= hcount_in_pipe[1][HWIDTH-1:2];
           vcount_out <= vcount_shifted[VWIDTH-1:2];
         end else begin
           data_valid_out <= 0;
-          mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in;
+          mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_outs[3];
         end
       end
     end

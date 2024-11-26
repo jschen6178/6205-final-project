@@ -446,7 +446,7 @@ module top_level (
     if (sys_rst_pixel) begin
       should_input_skeleton <= 0;
     end else begin
-      if (!skeleton_busy && binner_hcount == 319 && binner_vcount == 179) begin
+      if (!skeleton_busy && binner_hcount == 319 && binner_vcount == 179 && binner_valid) begin
         should_input_skeleton <= 1;
       end else if (skeleton_busy) begin
         should_input_skeleton <= 0;

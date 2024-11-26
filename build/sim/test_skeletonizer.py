@@ -133,18 +133,16 @@ async def test_a(dut):
         dut.pixel_valid_in.value = 0
         await ClockCycles(dut.clk_in, 2)
     await First(RisingEdge(dut.pixel_valid_out), ClockCycles(dut.clk_in, 200000))
-    await ClockCycles(dut.clk_in, 3)  # Ignore lazy pipelining fail
+    await FallingEdge(dut.clk_in)
     output = np.zeros((8, 8), dtype=int)
     for i in range(8):
         for j in range(8):
-            if i == 7 and j == 6:
-                break  # Ignore lazy pipelining fail
+            # print(f"i: {i}, j: {j}")
             assert dut.hcount_out.value == j
             assert dut.vcount_out.value == i
-            # print(f"i: {i}, j: {j}")
             # assert dut.skeleton_out.value == int(answer[i][j])
             output[i][j] = dut.skeleton_out.value
-            await ClockCycles(dut.clk_in, 1)
+            await FallingEdge(dut.clk_in)
     await ClockCycles(dut.clk_in, 10)
     assert dut.busy.value == 0
     print("\n".join(["".join([str(cell) for cell in row]) for row in output]))
