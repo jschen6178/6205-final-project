@@ -442,8 +442,8 @@ module top_level (
   logic        skeleton_busy;
   logic        should_input_skeleton;
 
-  always_ff @(posedge clk_camera) begin
-    if (sys_rst_camera) begin
+  always_ff @(posedge clk_pixel) begin
+    if (sys_rst_pixel) begin
       should_input_skeleton <= 0;
     end else begin
       if (!skeleton_busy && binner_hcount == 319 && binner_vcount == 179) begin

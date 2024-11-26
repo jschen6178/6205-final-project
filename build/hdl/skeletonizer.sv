@@ -149,8 +149,11 @@ module skeletonizer #(
       end
       if (outputting) begin
         skeleton_out <= frame_buffer_out;
-        hcount_out   <= iter_hcount_pipe[1];
-        vcount_out   <= iter_vcount_pipe[1];
+        hcount_out <= iter_hcount_pipe[1];
+        vcount_out <= iter_vcount_pipe[1];
+        pixel_valid_out <= 1;
+      end else begin
+        pixel_valid_out <= 0;
       end
     end
   end

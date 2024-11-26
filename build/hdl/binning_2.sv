@@ -29,19 +29,19 @@ module binning_2 #(
   logic [KERNEL_SIZE-1:0][DATA_WIDTH-1:0] pixel_outs;
   logic [LOG_MAX_COUNT:0] mask_count;
 
-  logic data_valid_in_pipe;
-  logic [HWIDTH-1:0] hcount_in_pipe;
-  logic [VWIDTH-1:0] vcount_in_pipe;
+  logic data_valid_in_pipe[0:1];
+  logic [HWIDTH-1:0] hcount_in_pipe[0:1];
+  logic [VWIDTH-1:0] vcount_in_pipe[0:1];
 
   logic [VWIDTH-1:0] vcount_shifted;
 
   always_comb begin
-    if (vcount_in_pipe == 0) begin
+    if (vcount_in_pipe[1] == 0) begin
       vcount_shifted = VRES - 2;
-    end else if (vcount_in_pipe == 1) begin
+    end else if (vcount_in_pipe[1] == 1) begin
       vcount_shifted = VRES - 1;
     end else begin
-      vcount_shifted = vcount_in_pipe - 2;
+      vcount_shifted = vcount_in_pipe[1] - 2;
     end
   end
 
@@ -50,35 +50,32 @@ module binning_2 #(
       weebs <= 1'b1 << (KERNEL_SIZE - 1);
       mask_count <= 0;
       data_valid_out <= 1'b0;
-      data_valid_in_pipe <= 1'b0;
+      data_valid_in_pipe[0] <= 1'b0;
+      data_valid_in_pipe[1] <= 1'b0;
     end else begin
-      data_valid_in_pipe <= data_valid_in;
-      if (data_valid_in_pipe) begin
-        hcount_in_pipe <= hcount_in;
-        vcount_in_pipe <= vcount_in;
-        hcount_out <= hcount_in_pipe[HWIDTH-1:2];
-        vcount_out <= vcount_shifted[VWIDTH-1:2];
-
-        case (weebs)
-          4'b1000: begin
-            if (hcount_in[1:0] == 2'b10) begin
-              data_valid_out <= 1'b1;
-              pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in) > 8 ? 1 : 0;
-              mask_count <= 0;
-            end else begin
-              data_valid_out <= 0;
-              mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in;
-            end
-          end
-
-          default: begin
-          end
-        endcase
-        if (vcount_in != vcount_in_pipe) begin
+      data_valid_in_pipe[0] <= data_valid_in;
+      data_valid_in_pipe[1] <= data_valid_in_pipe[0];
+      if (data_valid_in) begin
+        hcount_in_pipe[0] <= hcount_in;
+        vcount_in_pipe[0] <= vcount_in;
+        hcount_in_pipe[1] <= hcount_in_pipe[0];
+        vcount_in_pipe[1] <= vcount_in_pipe[0];
+        if (vcount_in_pipe[0] != vcount_in_pipe[1]) begin
           weebs <= {weebs[2:0], weebs[3]};
         end
-      end else begin
-        data_valid_out <= 1'b0;
+      end
+
+      if (data_valid_in_pipe[1]) begin
+        if (vcount_shifted[1:0] == 2'b11 && hcount_in_pipe[1][1:0] == 2'b11) begin
+          data_valid_out <= 1'b1;
+          pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in) > 8 ? 1 : 0;
+          mask_count <= 0;
+          hcount_out <= hcount_in_pipe[1][HWIDTH-1:2];
+          vcount_out <= vcount_shifted[VWIDTH-1:2];
+        end else begin
+          data_valid_out <= 0;
+          mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in;
+        end
       end
     end
   end
