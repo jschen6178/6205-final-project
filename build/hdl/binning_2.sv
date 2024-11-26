@@ -1,6 +1,6 @@
 `default_nettype none
 
-// what is happening is we are using 4 line buffers, and when we are writing to the 4th line buffer we 
+// we are using 4 line buffers, and when we are writing to the 4th line buffer we 
 // will start counting
 module binning_2 #(
     parameter int HRES = 1280,
@@ -53,6 +53,7 @@ module binning_2 #(
       data_valid_in_pipe[0] <= 1'b0;
       data_valid_in_pipe[1] <= 1'b0;
     end else begin
+      // pipelining
       data_valid_in_pipe[0] <= data_valid_in;
       data_valid_in_pipe[1] <= data_valid_in_pipe[0];
       if (data_valid_in) begin
@@ -64,7 +65,7 @@ module binning_2 #(
           weebs <= {weebs[2:0], weebs[3]};
         end
       end
-
+      //actual binning starts here
       if (data_valid_in_pipe[1]) begin
         if (vcount_shifted[1:0] == 2'b11 && hcount_in_pipe[1][1:0] == 2'b11) begin
           data_valid_out <= 1'b1;
