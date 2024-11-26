@@ -59,7 +59,7 @@ module binning_2 #(
         vcount_in_pipe[0] <= vcount_in;
         hcount_in_pipe[1] <= hcount_in_pipe[0];
         vcount_in_pipe[1] <= vcount_in_pipe[0];
-        if (vcount_in_pipe[0] != vcount_in_pipe[1]) begin
+        if (vcount_in_pipe[0] != vcount_in) begin
           weebs <= {weebs[2:0], weebs[3]};
         end
       end
@@ -75,6 +75,8 @@ module binning_2 #(
           data_valid_out <= 0;
           mask_count <= mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_outs[3];
         end
+      end else begin
+        data_valid_out <= 0;
       end
     end
   end
@@ -90,23 +92,23 @@ module binning_2 #(
           .RAM_DEPTH(HRES),
           .RAM_PERFORMANCE("HIGH_PERFORMANCE")
       ) line_buffer_ram (
-          .clka  (clk_in),         // Clock
+          .clka(clk_in),  // Clock
           //writing port:
-          .addra (hcount_in),      // Port A address bus,
-          .dina  (pixel_data_in),  // Port A RAM input data
-          .wea   (weebs[i]),       // Port A write enable
+          .addra(hcount_in_pipe[0]),  // Port A address bus,
+          .dina(pixel_data_in),  // Port A RAM input data
+          .wea(weebs[i] && data_valid_in_pipe[0]),  // Port A write enable
           //reading port:
-          .addrb (hcount_in),      // Port B address bus,
-          .doutb (pixel_outs[i]),  // Port B RAM output data,
-          .douta (),               // Port A RAM output data, width determined from RAM_WIDTH
-          .dinb  (0),              // Port B RAM input data, width determined from RAM_WIDTH
-          .web   (1'b0),           // Port B write enable
-          .ena   (1'b1),           // Port A RAM Enable
-          .enb   (1'b1),           // Port B RAM Enable,
-          .rsta  (1'b0),           // Port A output reset
-          .rstb  (1'b0),           // Port B output reset
-          .regcea(1'b1),           // Port A output register enable
-          .regceb(1'b1)            // Port B output register enable
+          .addrb(hcount_in),  // Port B address bus,
+          .doutb(pixel_outs[i]),  // Port B RAM output data,
+          .douta(),  // Port A RAM output data, width determined from RAM_WIDTH
+          .dinb(0),  // Port B RAM input data, width determined from RAM_WIDTH
+          .web(1'b0),  // Port B write enable
+          .ena(1'b1),  // Port A RAM Enable
+          .enb(1'b1),  // Port B RAM Enable,
+          .rsta(1'b0),  // Port A output reset
+          .rstb(1'b0),  // Port B output reset
+          .regcea(1'b1),  // Port A output register enable
+          .regceb(1'b1)  // Port B output register enable
       );
     end
   endgenerate
