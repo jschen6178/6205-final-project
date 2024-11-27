@@ -39,8 +39,12 @@ async def test_a(dut):
             dut.data_valid_in.value = 1
             dut.hcount_in.value = j
             dut.vcount_in.value = i
-            dut.pixel_data_in.value = 1
+            dut.pixel_data_in.value = (i % 3 != 0) & (j % 3 != 0)
             await ClockCycles(dut.clk_in, 1)
+        dut.data_valid_in.value = 0
+        dut.hcount_in.value = random.randint(0, 15)
+        dut.vcount_in.value = random.randint(0, 15)
+        await ClockCycles(dut.clk_in, 2)
     await ClockCycles(dut.clk_in, 10)
 
 
@@ -83,4 +87,3 @@ def binning_2_runner():
 
 if __name__ == "__main__":
     binning_2_runner()
-
