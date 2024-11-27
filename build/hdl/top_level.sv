@@ -428,7 +428,7 @@ module top_level (
       .hcount_in(hcount_hdmi),
       .vcount_in(vcount_hdmi),
       .pixel_data_in(mask),
-      .data_valid_in(frame_buff_tvalid),
+      .data_valid_in(frame_buff_tvalid && frame_buff_tready),
       .pixel_data_out(binner_pixel),
       .hcount_out(binner_hcount),
       .vcount_out(binner_vcount),
