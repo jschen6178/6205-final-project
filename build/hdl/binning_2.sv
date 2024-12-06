@@ -78,7 +78,7 @@ module binning_2 #(
       if (data_valid_in_pipe[1]) begin
         if (vcount_shifted[1:0] == 2'b11 && hcount_in_pipe[1][1:0] == 2'b11) begin
           data_valid_out <= 1'b1;
-          pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in_pipe[1]) > 8 ? 1 : 0;
+          pixel_data_out <= (mask_count + pixel_outs[0] + pixel_outs[1] + pixel_outs[2] + pixel_data_in_pipe[1]) > 8 ? 0 : 1;
           mask_count <= 0;
           hcount_out <= hcount_in_pipe[1][HWIDTH-1:2];
           vcount_out <= vcount_shifted[VWIDTH-1:2];
