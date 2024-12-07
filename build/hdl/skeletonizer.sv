@@ -14,7 +14,10 @@ module skeletonizer #(
     output logic [HWIDTH-1:0] hcount_out,
     output logic [VWIDTH-1:0] vcount_out,
     output logic pixel_valid_out,
-    output logic busy
+    output logic busy,
+    output logic [HWIDTH-1:0] x_com_out,
+    output logic [VWIDTH-1:0] y_com_out,
+    output logic com_valid_out
 );
   localparam int HWIDTH = $clog2(HORIZONTAL_COUNT);
   localparam int VWIDTH = $clog2(VERTICAL_COUNT);
@@ -247,6 +250,29 @@ module skeletonizer #(
       .rstb(1'b0),  // Port B output reset
       .regcea(1'b1),  // Port A output register enable
       .regceb(1'b1)  // Port B output register enable
+  );
+
+  // Center of mass calculation
+  logic prev_outputting;
+
+  always_ff @(posedge clk_in) begin
+    if (rst_in) begin
+      prev_outputting <= 0;
+    end else begin
+      prev_outputting <= outputting_pipe[1];
+    end
+  end
+
+  center_of_mass #() com (
+      .clk_in(clk_in),
+      .rst_in(iter_changed),
+      .x_in(iter_hcount_pipe[1]),
+      .y_in(iter_vcount_pipe[1]),
+      .valid_in(frame_buffer_out),
+      .tabulate_in(outputting_pipe[1] && !prev_outputting),
+      .x_out(x_com_out),
+      .y_out(y_com_out),
+      .valid_out(com_valid_out)
   );
 endmodule
 
