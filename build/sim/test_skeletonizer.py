@@ -143,7 +143,7 @@ async def test_a(dut):
             # assert dut.skeleton_out.value == int(answer[i][j])
             output[i][j] = dut.skeleton_out.value
             await FallingEdge(dut.clk_in)
-    await ClockCycles(dut.clk_in, 10)
+    await ClockCycles(dut.clk_in, 100)
     assert dut.busy.value == 0
     print("\n".join(["".join([str(cell) for cell in row]) for row in output]))
     assert np.array_equal(output, answer)
@@ -159,6 +159,8 @@ def main():
         proj_path / "hdl" / f"{MODULE_NAME}.sv",
         proj_path / "hdl" / "xilinx_true_dual_port_read_first_1_clock_ram.v",
         proj_path / "hdl" / "line_buffer.sv",
+        proj_path / "hdl" / "center_of_mass.sv",
+        proj_path / "hdl" / "divider.sv",
     ]
     build_test_args = ["-Wall"]
     parameters = {"HORIZONTAL_COUNT": 8, "VERTICAL_COUNT": 8}

@@ -1,22 +1,27 @@
 `default_nettype none
 
-module center_of_mass (
+module center_of_mass #(
+    parameter int HORIZONTAL_COUNT = 320,
+    parameter int VERTICAL_COUNT   = 180
+) (
     input wire clk_in,
     input wire rst_in,
-    input wire [10:0] x_in,
-    input wire [9:0] y_in,
+    input wire [HWIDTH-1:0] x_in,
+    input wire [VWIDTH-1:0] y_in,
     input wire valid_in,
     input wire tabulate_in,
-    output logic [10:0] x_out,
-    output logic [9:0] y_out,
+    output logic [HWIDTH-1:0] x_out,
+    output logic [VWIDTH-1:0] y_out,
     output logic valid_out
 );
+  localparam int HWIDTH = $clog2(HORIZONTAL_COUNT);
+  localparam int VWIDTH = $clog2(VERTICAL_COUNT);
   // your code here
 
-  logic [31:0] x_sum;
-  logic [31:0] y_sum;
-  logic [31:0] x_count;
-  logic [31:0] y_count;
+  logic [HWIDTH+VWIDTH+HWIDTH-1:0] x_sum;
+  logic [HWIDTH+VWIDTH+VWIDTH-1:0] y_sum;
+  logic [HWIDTH+VWIDTH-1:0] x_count;
+  logic [HWIDTH+VWIDTH-1:0] y_count;
   logic need_output, x_done, y_done;
 
   logic x_valid_out, y_valid_out, x_error_out, y_error_out, x_busy_out, y_busy_out;
@@ -63,7 +68,7 @@ module center_of_mass (
   end
 
   divider #(
-      .WIDTH(32)
+      .WIDTH(HWIDTH + VWIDTH + HWIDTH)
   ) x_divider (
       .clk_in(clk_in),
       .rst_in(rst_in),
@@ -78,7 +83,7 @@ module center_of_mass (
   );
 
   divider #(
-      .WIDTH(32)
+      .WIDTH(HWIDTH + VWIDTH + VWIDTH)
   ) y_divider (
       .clk_in(clk_in),
       .rst_in(rst_in),
