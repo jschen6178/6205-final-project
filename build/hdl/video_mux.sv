@@ -2,7 +2,7 @@
 `default_nettype none // prevents system from inferring an undeclared logic (good practice)
 
 module video_mux (
-    input wire [1:0] bg_in,  //regular video
+    input wire [1:0] bg_in, //decides what we want to see
     input wire bin_in,
     input wire [23:0] camera_pixel_in,  //16 bits from camera 5:6:5
     input wire thresholded_pixel_in,  //
@@ -10,16 +10,8 @@ module video_mux (
 );
 
   /*
-  00: normal camera out
-  01: channel image (in grayscale)
-  10: (thresholded channel image b/w)
-  11: y channel with magenta mask
-
-  upper bits:
-  00: nothing:
-  01: crosshair
-  10: sprite on top
-  11: nothing (orange test color)
+  00: nothing, just normal HD video
+  01: greenscreen max
   */
 
   logic [23:0] l_1;

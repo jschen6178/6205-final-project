@@ -525,7 +525,18 @@ module top_level (
   );
   assign ss0_c = ss_c;  //control upper four digit's cathodes!
   assign ss1_c = ss_c;  //same as above but for lower four digits!
-
+  
+  logic score_pixel_valid_out;
+  logic [7:0] score_red, score_green, score_blue;
+  score_sprite_2 score_sp (
+      .hcount_in(hcount_hdmi),
+      .vcount_in(vcount_hdmi),
+      .score(sw[15:13]),
+      .score_pixel_valid_out(score_pixel_valid_out),
+      .red_out(score_red),
+      .green_out(score_green),
+      .blue_out(score_blue)
+  );
   // HDMI video signal generator
   video_sig_gen vsg (
       .pixel_clk_in(clk_pixel),
@@ -555,7 +566,7 @@ module top_level (
   video_mux mvm (
       .bg_in(display_choice),  //choose background
       .bin_in(sw[4] ? (sw[0] ? skeleton_pixel & skeleton_valid : binner_pixel & binner_valid) : skeleton_buf_out),
-      .camera_pixel_in({fb_red, fb_green, fb_blue}),
+      .camera_pixel_in(score_pixel_valid_out ? {score_red, score_green, score_blue} : {fb_red, fb_green, fb_blue}),
       .thresholded_pixel_in(mask),  //one bit mask signal
       .pixel_out({red, green, blue})  //output to tmds
   );
