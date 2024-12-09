@@ -477,11 +477,11 @@ module top_level (
   logic pixel_scorer_valid_out;
   logic pixel_scorer_valid_in;
 
-  always_comb begin
-    if (reset_benchmark_skeleton && vcount_hdmi == 0 && hcount_hdmi == 0) begin
+  always_comb @(posedge clk_pixel) begin
+    if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
       pixel_scorer_valid_in = 1;
-    end else if (pixel_scorer_valid_in && pixel_scorer_hcount_out == 319 && pixel_scorer_vcount_out == 179) begin
-      pixel_scorer_valid_in = 0;
+    end else if (pixel_scorer_valid_in) begin
+      pixel_scorer_valid_in = skeleton_valid;
     end
   end
   pixel_scorer pixel_scorer_inst (
@@ -489,7 +489,9 @@ module top_level (
     .rst_in(sys_rst_pixel),
     .pixel_hcount_in(skeleton_hcount),
     .pixel_vcount_in(skeleton_vcount),
-    .pixel_in(skeleton_buf_out),
+    .hcount_in(hcount_hdmi[10:2]),
+    .vcount_in(vcount_hdmi[9:2]),
+    .pixel_in(skeleton_pixel),
     .pixel_valid_in(pixel_scorer_valid_in),
     .hcount_out(pixel_scorer_hcount_out),
     .vcount_out(pixel_scorer_vcount_out),
@@ -551,6 +553,7 @@ module top_level (
       .doutb(skeleton_buf_out)  // Port B RAM output data, width determined from RAM_WIDTH
   );
 
+  logic benchmark_skeleton_buf_out;
   //below might need some pipelining
   xilinx_true_dual_port_read_first_2_clock_ram #(
       .RAM_WIDTH(1),  // Specify RAM data width
