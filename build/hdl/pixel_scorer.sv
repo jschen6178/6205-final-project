@@ -52,19 +52,24 @@ module pixel_scorer #(
   logic [DWIDTH-1:0] real_read_data, real_prev_pixel_distance;
   logic [DWIDTH-1:0] real_line_buff_data, real_backward_prev_pixel_distance;
   always_comb begin
-    if (pixel_valid_in) begin // forward pass
-      read_addr = (pixel_vcount_in-1) * HRES + pixel_hcount_in; // 1D the address, should the -1 be there?
+    if (pixel_valid_in) begin  // forward pass
+      // If we are doing a forward pass, we need to look at the pixel above
+      read_addr = (pixel_vcount_in - 1) * HRES + pixel_hcount_in;
     end else if (doing_backward_pass) begin
+      // If we are doing a backward pass, since we don't have our current
+      // pixel, we need to look at that first and get the pixel above from
+      // the line buffer
       read_addr = backward_vcount * HRES + backward_hcount;
     end else begin
-      read_addr = vcount_in * HRES + hcount_in; // should this be vcount_in-1? or should the above not have - 1
+      // Otherwise, just look at the pixel we are querying
+      read_addr = vcount_in * HRES + hcount_in;
     end
-    if (input_data_valid_pipe[1]) begin //if forward pass
+    if (input_data_valid_pipe[1]) begin  // if forward pass
       write_addr = input_vcount_pipe[1] * HRES + input_hcount_pipe[1];
-      real_read_data = input_vcount_pipe[1] == 0 ? INF : read_data; // so this is the above pixel
-      real_prev_pixel_distance = input_hcount_pipe[1] == 0 ? INF : prev_valid_pixel_distance; // what about the top side pixel?
+      real_read_data = input_vcount_pipe[1] == 0 ? INF : read_data;  // this is the above pixel
+      real_prev_pixel_distance = input_hcount_pipe[1] == 0 ? INF : prev_valid_pixel_distance; // This is the pixel to the left
       if (pixel_in_pipe[1]) begin
-        write_data = 0; // we are as close as can be, on the skeleton
+        write_data = 0;  // we are as close as can be, on the skeleton
       end else if (real_prev_pixel_distance == INF && real_read_data == INF) begin
         write_data = INF;
       end else begin
@@ -74,8 +79,8 @@ module pixel_scorer #(
     end else if (backward_valid_pipe[1]) begin
       write_addr = backward_vcount_pipe[1] * HRES + backward_hcount_pipe[1];
       if (backward_vcount_pipe[1] == VRES - 1) begin
-        real_line_buff_data = INF; //should be the current distance value, not INF?
-      end else if (line_buff_weebs == 2'b01) begin
+        real_line_buff_data = INF;  // If we are at the bottom row, we can't look at the row below
+      end else if (line_buff_weebs == 2'b10) begin
         real_line_buff_data = backward_line_buff_data[0];
       end else begin
         real_line_buff_data = backward_line_buff_data[1];
@@ -83,9 +88,9 @@ module pixel_scorer #(
       real_backward_prev_pixel_distance = backward_hcount_pipe[1] == HRES - 1 ? INF : prev_backward_pixel_distance;
       if (read_data == INF && real_line_buff_data == INF && real_backward_prev_pixel_distance == INF) begin
         write_data = INF;
-      end else if (read_data < real_line_buff_data+2 && read_data < real_backward_prev_pixel_distance+2) begin
+      end else if (read_data < real_line_buff_data + 1 && read_data < real_backward_prev_pixel_distance + 1) begin
         write_data = read_data;
-      end else if (real_line_buff_data < read_data+2 && real_line_buff_data < real_backward_prev_pixel_distance+2) begin
+      end else if (real_line_buff_data + 1 < read_data && real_line_buff_data < real_backward_prev_pixel_distance) begin
         write_data = real_line_buff_data + 1;
       end else begin
         write_data = real_backward_prev_pixel_distance + 1;
@@ -105,9 +110,11 @@ module pixel_scorer #(
       input_data_valid_pipe[1] <= 0;
       backward_valid_pipe[0] <= 0;
       backward_valid_pipe[1] <= 0;
+      doing_backward_pass <= 0;
     end else begin
       // Logic for when we're not inputting a new skeleton
-      output_data_valid_pipe[0] <= !pixel_valid_in; // what about when you're doing backward pass?
+      output_data_valid_pipe[0] <= !pixel_valid_in && !input_data_valid_pipe[1] &&
+                                   !doing_backward_pass && !backward_valid_pipe[1];
       output_data_valid_pipe[1] <= output_data_valid_pipe[0];
       output_hcount_pipe[0] <= hcount_in;
       output_hcount_pipe[1] <= output_hcount_pipe[0];
@@ -139,7 +146,7 @@ module pixel_scorer #(
       // Update hcount and vcount for the backward pass
       if (doing_backward_pass) begin
         if (backward_hcount == 0) begin
-          if (backward_vcount == 0) begin // done with both passes
+          if (backward_vcount == 0) begin  // done with both passes
             doing_backward_pass <= 0;
             backward_valid_pipe[0] <= 0;
           end else begin
@@ -158,12 +165,8 @@ module pixel_scorer #(
       backward_vcount_pipe[0] <= backward_vcount;
       backward_vcount_pipe[1] <= backward_vcount_pipe[0];
       backward_valid_pipe[1]  <= backward_valid_pipe[0];
-      if (backward_valid_pipe[1]) begin // what's going on here
-        if (line_buff_weebs == 2'b01) begin
-          prev_backward_pixel_distance <= backward_line_buff_data[0];
-        end else begin
-          prev_backward_pixel_distance <= backward_line_buff_data[1];
-        end
+      if (backward_valid_pipe[1]) begin
+        prev_backward_pixel_distance <= write_data;
       end
     end
   end

@@ -39,7 +39,7 @@ async def test_a(dut):
             dut.pixel_valid_in.value = 1
             dut.pixel_hcount_in.value = j
             dut.pixel_vcount_in.value = i
-            dut.pixel_in.value = (j == 8) | (j == 7)
+            dut.pixel_in.value = (j == 8) | (j == 7) and i == 2
             await ClockCycles(dut.clk_in, 1)
 
     dut.pixel_valid_in.value = 0
@@ -50,6 +50,7 @@ async def test_a(dut):
             dut.hcount_in.value = j
             dut.vcount_in.value = i
             await ClockCycles(dut.clk_in, 1)
+
 
 """the code below should largely remain unchanged in structure, though the specific files and things
 specified should get updated for different simulations.
