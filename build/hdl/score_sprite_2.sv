@@ -1,6 +1,6 @@
 //takes in a number from scorer and displays things for video mux
-
-module score_sprite(
+// this one has been tested and works
+module score_sprite_2(
   input wire [10:0] hcount_in,
   input wire [9:0] vcount_in,
   input wire [2:0] score, // actual score
