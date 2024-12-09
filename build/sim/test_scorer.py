@@ -34,16 +34,17 @@ async def test_a(dut):
 
     await ClockCycles(dut.clk_in, 3)
 
-    for i in range(128):
-        for j in range(128):
-            dut.valid_in.value = 1
-            dut.hcount_in.value = j
-            dut.vcount_in.value = i
-            dut.pixel_distance = i+j
-            dut.skeleton_bit.value = 1
-            await ClockCycles(dut.clk_in, 1)
-
-    await ClockCycles(dut.clk_in, 3)
+    for s in range(5):
+        for i in range(16):
+            for j in range(16):
+                dut.valid_in.value = 1
+                dut.hcount_in.value = j
+                dut.vcount_in.value = i
+                dut.pixel_distance = 3
+                dut.skeleton_bit.value = 1
+                await ClockCycles(dut.clk_in, 1)
+        await ClockCycles(dut.clk_in, 10)
+    
 
 """the code below should largely remain unchanged in structure, though the specific files and things
 specified should get updated for different simulations.
@@ -60,7 +61,7 @@ def scorer_runner():
         proj_path / "hdl" / "scorer.sv",
     ]  # grow/modify this as needed.
     build_test_args = ["-Wall"]  # ,"COCOTB_RESOLVE_X=ZEROS"]
-    parameters = {"HRES": 128, "VRES": 128}
+    parameters = {"HRES": 16, "VRES": 16}
     sys.path.append(str(proj_path / "sim"))
     runner = get_runner(sim)
     runner.build(

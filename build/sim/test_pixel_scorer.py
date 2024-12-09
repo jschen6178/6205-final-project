@@ -42,8 +42,6 @@ async def test_a(dut):
             dut.pixel_in.value = (j == 8) | (j == 7) and i == 2
             await ClockCycles(dut.clk_in, 1)
 
-    dut.pixel_valid_in.value = 0
-    await ClockCycles(dut.clk_in, 257)
     for i in range(16):
         for j in range(16):
             dut.pixel_valid_in.value = 0
@@ -51,6 +49,12 @@ async def test_a(dut):
             dut.vcount_in.value = i
             await ClockCycles(dut.clk_in, 1)
 
+    for i in range(16):
+        for j in range(16):
+            dut.pixel_valid_in.value = 0
+            dut.hcount_in.value = j
+            dut.vcount_in.value = i
+            await ClockCycles(dut.clk_in, 1)
     await ClockCycles(dut.clk_in, 3)
 
 """the code below should largely remain unchanged in structure, though the specific files and things

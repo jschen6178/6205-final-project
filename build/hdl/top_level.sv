@@ -473,17 +473,28 @@ module top_level (
   logic skeleton_buf_out;
   logic [8:0] pixel_scorer_hcount_out;
   logic [7:0] pixel_scorer_vcount_out;
-  logic [10:0] pixel_scorer_distance_out;
+  logic [9:0] pixel_scorer_distance_out;
   logic pixel_scorer_valid_out;
   logic pixel_scorer_valid_in;
 
-  always_comb @(posedge clk_pixel) begin
+  // always_comb begin
+  //   if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
+  //     pixel_scorer_valid_in = 1;
+  //   end else if (pixel_scorer_valid_in) begin
+  //     pixel_scorer_valid_in = skeleton_valid;
+  //   end
+  // end
+
+  always_ff @(posedge clk_pixel) begin
+    if (sys_rst_pixel) pixel_scorer_valid_in <= 0;
+
     if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
-      pixel_scorer_valid_in = 1;
-    end else if (pixel_scorer_valid_in) begin
-      pixel_scorer_valid_in = skeleton_valid;
+      pixel_scorer_valid_in <= 1; 
+    end else if (pixel_scorer_valid_in && skeleton_hcount == 319 && skeleton_vcount == 179) begin
+      pixel_scorer_valid_in <= 0; 
     end
   end
+
   pixel_scorer pixel_scorer_inst (
     .clk_in(clk_pixel),
     .rst_in(sys_rst_pixel),
@@ -491,7 +502,7 @@ module top_level (
     .pixel_vcount_in(skeleton_vcount),
     .hcount_in(hcount_hdmi[10:2]),
     .vcount_in(vcount_hdmi[9:2]),
-    .pixel_in(skeleton_pixel),
+    .pixel_in(skeleton_pixel), // this might not work with the above hcount and vcount
     .pixel_valid_in(pixel_scorer_valid_in),
     .hcount_out(pixel_scorer_hcount_out),
     .vcount_out(pixel_scorer_vcount_out),
@@ -499,34 +510,48 @@ module top_level (
     .data_valid_out(pixel_scorer_valid_out)
   );
 
-  logic skeleton_bit_buffer;
-  logic [2:0] skeleton_valid_buffer;
+
+  logic [2:0] skeleton_pixel_buffer;
   logic score_valid;
   logic [2:0] final_score;
   always_ff @(posedge clk_pixel) begin
-    skeleton_bit_buffer <= skeleton_buf_out;
+    if (sys_rst_pixel) begin
+      
+    skeleton_pixel_buffer = 3'b0;
+    end else begin
 
-    skeleton_valid_buffer[0] <= pixel_scorer_valid_out;
-    skeleton_valid_buffer[1] <= skeleton_valid_buffer[0];
-    skeleton_valid_buffer[2] <= skeleton_valid_buffer[1];
-
+    skeleton_pixel_buffer[0] <= skeleton_pixel;
+    skeleton_pixel_buffer[1] <= skeleton_pixel_buffer[0];
+    skeleton_pixel_buffer[2] <= skeleton_pixel_buffer[1];
+    end
   end
   scorer scorer_inst(
     .clk_in(clk_pixel),
     .rst_in(sys_rst_pixel),
-    .hcount_in(pixel_scorer_hcount_out),
-    .vcount_in(pixel_scorer_vcount_out),
-    .skeleton_bit(skeleton_bit_buffer),
+    .hcount_in(pixel_scorer_hcount_out), // not really used just to get valid out
+    .vcount_in(pixel_scorer_vcount_out), // this too
+    .skeleton_bit(skeleton_pixel_buffer[2]),
     .pixel_distance(pixel_scorer_distance_out),
-    .valid_in(skeleton_valid_buffer[2]),
+    .valid_in(pixel_scorer_valid_out),
     .valid_out(score_valid),
     .final_score(final_score)
+  );
+
+  logic [3:0] display_slow_count;
+
+  evt_counter #(
+    .MAX_COUNT(10)
+    ) display_slower(
+    .clk_in(clk_pixel),
+    .rst_in(sys_rst_pixel),
+    .evt_in(score_valid),
+    .count_out(display_slow_count)
   );
 
   logic [2:0] display_final_score;
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) display_final_score <= 0;
-    else display_final_score <= score_valid ? final_score : display_final_score;
+    else display_final_score <= (score_valid && display_slow_count == 0) ? final_score : display_final_score;
   end
 
   // TODO: store skeleton output in a frame buffer

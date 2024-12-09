@@ -1,8 +1,8 @@
 // highest score comes from a really low score relative to the max.
-
+// changed form 63 to 31 make sure bit widths are okay
 
 module scorer #( 
-  parameter int MAX_PIXEL_DISTANCE = 63,
+  parameter int MAX_PIXEL_DISTANCE = 31,
   parameter int MAX_PIXEL_SCORE = 7,
   parameter int HRES = 320,
   parameter int VRES = 180
@@ -28,7 +28,7 @@ localparam int PWIDTH = $clog2(MAX_PIXEL_SCORE);
 localparam int LOG_MAX_SCORE = HWIDTH + VWIDTH + PWIDTH;
 
 logic [MWIDTH-1:0] cutoff_pixel_distance;
-logic [MWIDTH-4:0] pixel_score;
+logic [MWIDTH-3:0] pixel_score;
 logic [LOG_MAX_SCORE-1:0] max_score;
 logic [LOG_MAX_SCORE-1:0] skeleton_score;
 // this is hardcoded. for loop could be better?
@@ -37,7 +37,7 @@ logic [LOG_MAX_SCORE-1:0] perfect_score;
 always_comb begin
   cutoff_pixel_distance = (pixel_distance > MAX_PIXEL_DISTANCE) ? MAX_PIXEL_DISTANCE : pixel_distance;
   
-  pixel_score = cutoff_pixel_distance>>3;
+  pixel_score = cutoff_pixel_distance>>2;
 
   perfect_score = max_score >> 3;
 
@@ -49,27 +49,41 @@ always_comb begin
                 (skeleton_score < perfect_score*6) ? 5 :
                 (skeleton_score < perfect_score*7) ? 6 : 7;
 end
+typedef enum {
+  IDLE,
+  SCORING,
+  OUTPUT
+} score_state;
 
+score_state state;
 always_ff @(posedge clk_in) begin
   if (rst_in) begin
+    state <= IDLE;
     valid_out <= 0;
     max_score <= 0;
     skeleton_score <= 0;
   end else begin
-  if (valid_in) begin
-  if (hcount_in == HRES-1 && vcount_in == VRES-1) begin
-    valid_out <= 1;
-  end else
-    valid_out <= 0;
-    max_score = max_score + MAX_PIXEL_SCORE;
-    skeleton_score <= skeleton_bit ? skeleton_score + pixel_score : skeleton_score;
-  end else valid_out <= 0;
-  // reset for next score
-  if (valid_out) begin
-    valid_out <= 0;
-    max_score <= 0;
-    skeleton_score <= 0;
-  end
+
+    case (state)
+    IDLE: begin
+      valid_out <= 0;
+      max_score <= 0;
+      skeleton_score <= 0;
+      if (valid_in && vcount_in == 0) state <= SCORING;
+    end
+    SCORING: begin
+      if (hcount_in == HRES-1 && vcount_in == VRES-1) begin
+        state <= OUTPUT;
+      end else begin
+        max_score <= skeleton_bit ? max_score + MAX_PIXEL_SCORE : max_score;
+        skeleton_score <= skeleton_bit ? skeleton_score + pixel_score : skeleton_score;
+      end
+    end
+    OUTPUT: begin
+      valid_out <= 1;
+      state <= IDLE;
+    end
+    endcase
 end
 end
 endmodule
