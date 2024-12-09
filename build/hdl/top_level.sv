@@ -49,7 +49,7 @@ module top_level (
   // Clock and Reset Signals: updated for a couple new clocks!
   logic sys_rst_camera;
   logic sys_rst_pixel;
-
+  
   logic clk_camera;
   logic clk_pixel;
   logic clk_5x;
@@ -89,7 +89,6 @@ module top_level (
   assign sys_rst_camera = btn[0];  //use for resetting camera side of logic
   assign sys_rst_pixel = btn[0];  //use for resetting hdmi/draw side of logic
   assign sys_rst_migref = btn[0];
-
 
   // video signal generator signals
   logic        hsync_hdmi;
@@ -467,8 +466,66 @@ module top_level (
       .vcount_out(skeleton_vcount),
       .busy(skeleton_busy)
   );
+  logic reset_benchmark_skeleton;
+  assign reset_benchmark_skeleton = btn[3]; // press this when you want a new benchmark pose
 
+  
   logic skeleton_buf_out;
+  logic [8:0] pixel_scorer_hcount_out;
+  logic [7:0] pixel_scorer_vcount_out;
+  logic [10:0] pixel_scorer_distance_out;
+  logic pixel_scorer_valid_out;
+  logic pixel_scorer_valid_in;
+
+  always_comb begin
+    if (reset_benchmark_skeleton && vcount_hdmi == 0 && hcount_hdmi == 0) begin
+      pixel_scorer_valid_in = 1;
+    end else if (pixel_scorer_valid_in && pixel_scorer_hcount_out == 319 && pixel_scorer_vcount_out == 179) begin
+      pixel_scorer_valid_in = 0;
+    end
+  end
+  pixel_scorer pixel_scorer_inst (
+    .clk_in(clk_pixel),
+    .rst_in(sys_rst_pixel),
+    .pixel_hcount_in(skeleton_hcount),
+    .pixel_vcount_in(skeleton_vcount),
+    .pixel_in(skeleton_buf_out),
+    .pixel_valid_in(pixel_scorer_valid_in),
+    .hcount_out(pixel_scorer_hcount_out),
+    .vcount_out(pixel_scorer_vcount_out),
+    .distance_out(pixel_scorer_distance_out),
+    .data_valid_out(pixel_scorer_valid_out)
+  );
+
+  logic skeleton_bit_buffer;
+  logic [2:0] skeleton_valid_buffer;
+  logic score_valid;
+  logic [2:0] final_score;
+  always_ff @(posedge clk_pixel) begin
+    skeleton_bit_buffer <= skeleton_buf_out;
+
+    skeleton_valid_buffer[0] <= pixel_scorer_valid_out;
+    skeleton_valid_buffer[1] <= skeleton_valid_buffer[0];
+    skeleton_valid_buffer[2] <= skeleton_valid_buffer[1];
+
+  end
+  scorer scorer_inst(
+    .clk_in(clk_pixel),
+    .rst_in(sys_rst_pixel),
+    .hcount_in(pixel_scorer_hcount_out),
+    .vcount_in(pixel_scorer_vcount_out),
+    .skeleton_bit(skeleton_bit_buffer),
+    .pixel_distance(pixel_scorer_distance_out),
+    .valid_in(skeleton_valid_buffer[2]),
+    .valid_out(score_valid),
+    .final_score(final_score)
+  );
+
+  logic [2:0] display_final_score;
+  always_ff @(posedge clk_pixel) begin
+    if (sys_rst_pixel) display_final_score <= 0;
+    else display_final_score <= score_valid ? final_score : display_final_score;
+  end
 
   // TODO: store skeleton output in a frame buffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
@@ -494,6 +551,29 @@ module top_level (
       .doutb(skeleton_buf_out)  // Port B RAM output data, width determined from RAM_WIDTH
   );
 
+  //below might need some pipelining
+  xilinx_true_dual_port_read_first_2_clock_ram #(
+      .RAM_WIDTH(1),  // Specify RAM data width
+      .RAM_DEPTH(320 * 180),  // Specify RAM depth (number of entries)
+      .RAM_PERFORMANCE("HIGH_PERFORMANCE")
+  ) benchmark_skeleton_frame_buffer (
+      .addra(skeleton_vcount * 320 + skeleton_hcount),  // Port A address bus, width determined from RAM_DEPTH
+      .addrb(vcount_hdmi[9:2] * 320 + hcount_hdmi[10:2]),  // Port B address bus, width determined from RAM_DEPTH
+      .dina(skeleton_pixel),  // Port A RAM input data, width determined from RAM_WIDTH
+      .dinb(),  // Port B RAM input data, width determined from RAM_WIDTH
+      .clka(clk_pixel),  // Port A clock
+      .clkb(clk_pixel),  // Port B clock
+      .wea(pixel_scorer_valid_in),  // Port A write enable
+      .web(0),  // Port B write enable
+      .ena(1'b1),  // Port A RAM Enable, for additional power savings, disable port when not in use
+      .enb(1'b1),  // Port B RAM Enable, for additional power savings, disable port when not in use
+      .rsta(sys_rst_pixel),  // Port A output reset (does not affect memory contents)
+      .rstb(sys_rst_pixel),  // Port B output reset (does not affect memory contents)
+      .regcea(1'b1),  // Port A output register enable
+      .regceb(1'b1),  // Port B output register enable
+      .douta(),  // Port A RAM output data, width determined from RAM_WIDTH
+      .doutb(benchmark_skeleton_buf_out)  // Port B RAM output data, width determined from RAM_WIDTH
+  );
   // Frame buffer stuff (Try not to touch)
 
   logic [15:0] frame_buff_dram;  // data out of DRAM frame buffer
@@ -531,7 +611,7 @@ module top_level (
   score_sprite_2 score_sp (
       .hcount_in(hcount_hdmi),
       .vcount_in(vcount_hdmi),
-      .score(sw[15:13]),
+      .score(display_final_score),
       .score_pixel_valid_out(score_pixel_valid_out),
       .red_out(score_red),
       .green_out(score_green),
@@ -565,6 +645,7 @@ module top_level (
 
   video_mux mvm (
       .bg_in(display_choice),  //choose background
+      .benchmark_skeleton_bit(benchmark_skeleton_buf_out),
       .bin_in(sw[4] ? (sw[0] ? skeleton_pixel & skeleton_valid : binner_pixel & binner_valid) : skeleton_buf_out),
       .camera_pixel_in(score_pixel_valid_out ? {score_red, score_green, score_blue} : {fb_red, fb_green, fb_blue}),
       .thresholded_pixel_in(mask),  //one bit mask signal
