@@ -500,8 +500,8 @@ module top_level (
     .rst_in(sys_rst_pixel),
     .pixel_hcount_in(skeleton_hcount),
     .pixel_vcount_in(skeleton_vcount),
-    .hcount_in(hcount_hdmi[10:2]),
-    .vcount_in(vcount_hdmi[9:2]),
+    .hcount_in(skeleton_hcount), // try this, see if it fixes it //justin @6:23pm monday
+    .vcount_in(skeleton_vcount),
     .pixel_in(skeleton_pixel), // this might not work with the above hcount and vcount
     .pixel_valid_in(pixel_scorer_valid_in),
     .hcount_out(pixel_scorer_hcount_out),
