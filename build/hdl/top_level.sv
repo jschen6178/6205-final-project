@@ -49,7 +49,7 @@ module top_level (
   // Clock and Reset Signals: updated for a couple new clocks!
   logic sys_rst_camera;
   logic sys_rst_pixel;
-  
+
   logic clk_camera;
   logic clk_pixel;
   logic clk_5x;
@@ -467,94 +467,90 @@ module top_level (
       .busy(skeleton_busy)
   );
   logic reset_benchmark_skeleton;
-  assign reset_benchmark_skeleton = btn[3]; // press this when you want a new benchmark pose
+  assign reset_benchmark_skeleton = btn[3];  // press this when you want a new benchmark pose
 
-  
+
   logic skeleton_buf_out;
   logic [8:0] pixel_scorer_hcount_out;
   logic [7:0] pixel_scorer_vcount_out;
   logic [9:0] pixel_scorer_distance_out;
   logic pixel_scorer_valid_out;
+
   logic pixel_scorer_valid_in;
 
-  // always_comb begin
-  //   if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
-  //     pixel_scorer_valid_in = 1;
-  //   end else if (pixel_scorer_valid_in) begin
-  //     pixel_scorer_valid_in = skeleton_valid;
-  //   end
-  // end
-
   always_ff @(posedge clk_pixel) begin
-    if (sys_rst_pixel) pixel_scorer_valid_in <= 0;
-
-    if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
-      pixel_scorer_valid_in <= 1; 
+    if (sys_rst_pixel) begin
+      pixel_scorer_valid_in <= 0;
+    end else if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
+      pixel_scorer_valid_in <= 1;
     end else if (pixel_scorer_valid_in && skeleton_hcount == 319 && skeleton_vcount == 179) begin
-      pixel_scorer_valid_in <= 0; 
+      pixel_scorer_valid_in <= 0;
     end
   end
 
   pixel_scorer pixel_scorer_inst (
-    .clk_in(clk_pixel),
-    .rst_in(sys_rst_pixel),
-    .pixel_hcount_in(skeleton_hcount),
-    .pixel_vcount_in(skeleton_vcount),
-    .hcount_in(skeleton_hcount), // try this, see if it fixes it //justin @6:23pm monday
-    .vcount_in(skeleton_vcount),
-    .pixel_in(skeleton_pixel), // this might not work with the above hcount and vcount
-    .pixel_valid_in(pixel_scorer_valid_in),
-    .hcount_out(pixel_scorer_hcount_out),
-    .vcount_out(pixel_scorer_vcount_out),
-    .distance_out(pixel_scorer_distance_out),
-    .data_valid_out(pixel_scorer_valid_out)
+      .clk_in(clk_pixel),
+      .rst_in(sys_rst_pixel),
+      .pixel_hcount_in(skeleton_hcount),
+      .pixel_vcount_in(skeleton_vcount),
+      .hcount_in(skeleton_hcount),  // try this, see if it fixes it //justin @6:23pm monday
+      .vcount_in(skeleton_vcount),
+      .pixel_in(skeleton_pixel),  // this might not work with the above hcount and vcount
+      .pixel_valid_in(pixel_scorer_valid_in),
+      .hcount_out(pixel_scorer_hcount_out),
+      .vcount_out(pixel_scorer_vcount_out),
+      .distance_out(pixel_scorer_distance_out),
+      .data_valid_out(pixel_scorer_valid_out)
   );
 
-
-  logic [2:0] skeleton_pixel_buffer;
+  logic skeleton_pixel_pipe[0:2];
+  logic skeleton_valid_pipe[0:2];
   logic score_valid;
   logic [2:0] final_score;
+
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) begin
-      
-    skeleton_pixel_buffer = 3'b0;
+      skeleton_pixel_pipe <= 3'b0;
     end else begin
-
-    skeleton_pixel_buffer[0] <= skeleton_pixel;
-    skeleton_pixel_buffer[1] <= skeleton_pixel_buffer[0];
-    skeleton_pixel_buffer[2] <= skeleton_pixel_buffer[1];
+      skeleton_pixel_pipe[0] <= skeleton_pixel;
+      skeleton_pixel_pipe[1] <= skeleton_pixel_pipe[0];
+      skeleton_pixel_pipe[2] <= skeleton_pixel_pipe[1];
+      skeleton_valid_pipe[0] <= skeleton_valid;
+      skeleton_valid_pipe[1] <= skeleton_valid_pipe[0];
+      skeleton_valid_pipe[2] <= skeleton_valid_pipe[1];
     end
   end
-  scorer scorer_inst(
-    .clk_in(clk_pixel),
-    .rst_in(sys_rst_pixel),
-    .hcount_in(pixel_scorer_hcount_out), // not really used just to get valid out
-    .vcount_in(pixel_scorer_vcount_out), // this too
-    .skeleton_bit(skeleton_pixel_buffer[2]),
-    .pixel_distance(pixel_scorer_distance_out),
-    .valid_in(pixel_scorer_valid_out),
-    .valid_out(score_valid),
-    .final_score(final_score)
+
+  scorer scorer_inst (
+      .clk_in(clk_pixel),
+      .rst_in(sys_rst_pixel),
+      .hcount_in(pixel_scorer_hcount_out),  // not really used just to get valid out
+      .vcount_in(pixel_scorer_vcount_out),  // this too
+      .skeleton_bit(skeleton_pixel_pipe[2]),
+      .pixel_distance(pixel_scorer_distance_out),
+      .valid_in(pixel_scorer_valid_out && skeleton_valid_pipe[2]),
+      .valid_out(score_valid),
+      .final_score(final_score)
   );
 
   logic [3:0] display_slow_count;
 
   evt_counter #(
-    .MAX_COUNT(10)
-    ) display_slower(
-    .clk_in(clk_pixel),
-    .rst_in(sys_rst_pixel),
-    .evt_in(score_valid),
-    .count_out(display_slow_count)
+      .MAX_COUNT(10)
+  ) display_slower (
+      .clk_in(clk_pixel),
+      .rst_in(sys_rst_pixel),
+      .evt_in(score_valid),
+      .count_out(display_slow_count)
   );
 
   logic [2:0] display_final_score;
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) display_final_score <= 0;
-    else display_final_score <= (score_valid && display_slow_count == 0) ? final_score : display_final_score;
+    else
+      display_final_score <= (score_valid && display_slow_count == 0) ? final_score : display_final_score;
   end
 
-  // TODO: store skeleton output in a frame buffer
   xilinx_true_dual_port_read_first_2_clock_ram #(
       .RAM_WIDTH(1),  // Specify RAM data width
       .RAM_DEPTH(320 * 180),  // Specify RAM depth (number of entries)
@@ -633,7 +629,7 @@ module top_level (
   );
   assign ss0_c = ss_c;  //control upper four digit's cathodes!
   assign ss1_c = ss_c;  //same as above but for lower four digits!
-  
+
   logic score_pixel_valid_out;
   logic [7:0] score_red, score_green, score_blue;
   score_sprite_2 score_sp (
