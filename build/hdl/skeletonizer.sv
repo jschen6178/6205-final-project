@@ -263,7 +263,7 @@ module skeletonizer #(
     end
   end
 
-  center_of_mass #() com (
+  center_of_mass com (
       .clk_in(clk_in),
       .rst_in(iter_changed),
       .x_in(iter_hcount_pipe[1]),

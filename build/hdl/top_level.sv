@@ -439,6 +439,11 @@ module top_level (
   logic       skeleton_pixel;
   logic       skeleton_valid;
   logic       skeleton_busy;
+  logic [8:0] skeleton_com_out_x;
+  logic [7:0] skeleton_com_out_y;
+  logic       skeleton_com_valid;
+  logic [8:0] skeleton_com_x;
+  logic [7:0] skeleton_com_y;
   logic       should_input_skeleton;
 
   always_ff @(posedge clk_pixel) begin
@@ -464,11 +469,14 @@ module top_level (
       .pixel_valid_out(skeleton_valid),
       .hcount_out(skeleton_hcount),
       .vcount_out(skeleton_vcount),
-      .busy(skeleton_busy)
+      .busy(skeleton_busy),
+      .x_com_out(skeleton_com_out_x),
+      .y_com_out(skeleton_com_out_y),
+      .com_valid_out(skeleton_com_valid)
   );
+
   logic reset_benchmark_skeleton;
   assign reset_benchmark_skeleton = btn[3];  // press this when you want a new benchmark pose
-
 
   logic skeleton_buf_out;
   logic [8:0] pixel_scorer_hcount_out;
@@ -476,15 +484,53 @@ module top_level (
   logic [9:0] pixel_scorer_distance_out;
   logic pixel_scorer_valid_out;
 
-  logic pixel_scorer_valid_in;
+  logic storing_reference_skeleton;
+  logic [8:0] reference_com_x;
+  logic [7:0] reference_com_y;
 
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) begin
-      pixel_scorer_valid_in <= 0;
+      storing_reference_skeleton <= 0;
     end else if (reset_benchmark_skeleton && skeleton_valid && skeleton_hcount == 0 && skeleton_vcount == 0) begin
-      pixel_scorer_valid_in <= 1;
-    end else if (pixel_scorer_valid_in && skeleton_hcount == 319 && skeleton_vcount == 179) begin
-      pixel_scorer_valid_in <= 0;
+      storing_reference_skeleton <= 1;
+    end else if (storing_reference_skeleton && skeleton_hcount == 319 && skeleton_vcount == 179) begin
+      storing_reference_skeleton <= 0;
+    end
+  end
+
+  always_ff @(posedge clk_pixel) begin
+    if (sys_rst_pixel) begin
+      reference_com_x <= 0;
+      reference_com_y <= 0;
+      skeleton_com_x  <= 0;
+      skeleton_com_y  <= 0;
+    end else if (skeleton_com_valid) begin
+      skeleton_com_x <= skeleton_com_out_x;
+      skeleton_com_y <= skeleton_com_out_y;
+      if (storing_reference_skeleton) begin
+        reference_com_x <= skeleton_com_out_x;
+        reference_com_y <= skeleton_com_out_y;
+      end
+    end
+  end
+
+  logic [8:0] shifted_skeleton_hcount;
+  logic [7:0] shifted_skeleton_vcount;
+
+  always_comb begin
+    if (reference_com_x > {1'b0, skeleton_hcount} + skeleton_com_x) begin
+      shifted_skeleton_hcount = 0;
+    end else if ({1'b0, skeleton_hcount} + skeleton_com_x > {1'b0, reference_com_x} + 319) begin
+      shifted_skeleton_hcount = 319;
+    end else begin
+      shifted_skeleton_hcount = skeleton_hcount + skeleton_com_x - reference_com_x;
+    end
+    if (reference_com_y > {1'b0, skeleton_vcount} + skeleton_com_y) begin
+      shifted_skeleton_vcount = 0;
+    end else if ({1'b0, skeleton_vcount} + skeleton_com_y > {1'b0, reference_com_y} + 179) begin
+      shifted_skeleton_vcount = 179;
+    end else begin
+      shifted_skeleton_vcount = skeleton_vcount + skeleton_com_y - reference_com_y;
     end
   end
 
@@ -493,10 +539,10 @@ module top_level (
       .rst_in(sys_rst_pixel),
       .pixel_hcount_in(skeleton_hcount),
       .pixel_vcount_in(skeleton_vcount),
-      .hcount_in(skeleton_hcount),  // try this, see if it fixes it //justin @6:23pm monday
-      .vcount_in(skeleton_vcount),
-      .pixel_in(skeleton_pixel),  // this might not work with the above hcount and vcount
-      .pixel_valid_in(pixel_scorer_valid_in),
+      .hcount_in(shifted_skeleton_hcount),
+      .vcount_in(shifted_skeleton_vcount),
+      .pixel_in(skeleton_pixel),
+      .pixel_valid_in(storing_reference_skeleton),
       .hcount_out(pixel_scorer_hcount_out),
       .vcount_out(pixel_scorer_vcount_out),
       .distance_out(pixel_scorer_distance_out),
@@ -510,7 +556,9 @@ module top_level (
 
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) begin
-      skeleton_pixel_pipe <= 3'b0;
+      skeleton_pixel_pipe[0] <= 1'b0;
+      skeleton_pixel_pipe[1] <= 1'b0;
+      skeleton_pixel_pipe[2] <= 1'b0;
     end else begin
       skeleton_pixel_pipe[0] <= skeleton_pixel;
       skeleton_pixel_pipe[1] <= skeleton_pixel_pipe[0];
@@ -587,7 +635,7 @@ module top_level (
       .dinb(),  // Port B RAM input data, width determined from RAM_WIDTH
       .clka(clk_pixel),  // Port A clock
       .clkb(clk_pixel),  // Port B clock
-      .wea(pixel_scorer_valid_in),  // Port A write enable
+      .wea(storing_reference_skeleton),  // Port A write enable
       .web(0),  // Port B write enable
       .ena(1'b1),  // Port A RAM Enable, for additional power savings, disable port when not in use
       .enb(1'b1),  // Port B RAM Enable, for additional power savings, disable port when not in use
@@ -598,14 +646,13 @@ module top_level (
       .douta(),  // Port A RAM output data, width determined from RAM_WIDTH
       .doutb(benchmark_skeleton_buf_out)  // Port B RAM output data, width determined from RAM_WIDTH
   );
-  // Frame buffer stuff (Try not to touch)
 
   logic [15:0] frame_buff_dram;  // data out of DRAM frame buffer
 
-  logic [ 6:0] ss_c;
   //modified version of seven segment display for showing
   // thresholds and selected channel
   // special customized version
+  logic [ 6:0] ss_c;
   seven_segment_display mssc (
       .clk_in(clk_pixel),
       .rst_in(sys_rst_pixel),
@@ -632,6 +679,7 @@ module top_level (
 
   logic score_pixel_valid_out;
   logic [7:0] score_red, score_green, score_blue;
+
   score_sprite_2 score_sp (
       .hcount_in(hcount_hdmi),
       .vcount_in(vcount_hdmi),
@@ -641,6 +689,7 @@ module top_level (
       .green_out(score_green),
       .blue_out(score_blue)
   );
+
   // HDMI video signal generator
   video_sig_gen vsg (
       .pixel_clk_in(clk_pixel),
@@ -653,7 +702,6 @@ module top_level (
       .ad_out(active_draw_hdmi),
       .fc_out(frame_count_hdmi)
   );
-
 
   // Video Mux: select from the different display modes based on switch values
   //used with switches for display selections
@@ -714,9 +762,7 @@ module top_level (
       .tmds_out(tmds_10b[0])
   );
 
-
   //three tmds_serializers (blue, green, red):
-  //MISSING: two more serializers for the green and blue tmds signals.
   tmds_serializer red_ser (
       .clk_pixel_in(clk_pixel),
       .clk_5x_in(clk_5x),
@@ -765,7 +811,6 @@ module top_level (
       .O (hdmi_clk_p),
       .OB(hdmi_clk_n)
   );
-
 
   // Nothing To Touch Down Here:
   // register writes to the camera
@@ -863,6 +908,4 @@ module top_level (
 
 endmodule  // top_level
 
-
 `default_nettype wire
-

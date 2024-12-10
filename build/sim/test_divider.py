@@ -4,20 +4,10 @@ import random
 import sys
 import logging
 from pathlib import Path
-from cocotb.triggers import Timer, ClockCycles, FallingEdge, ReadOnly
+from cocotb.triggers import Timer, ClockCycles, FallingEdge, ReadOnly, RisingEdge
 from cocotb.clock import Clock
 from cocotb.utils import get_sim_time as gst
 from cocotb.runner import get_runner
-
-half_pixels = [0x12, 0x34, 0x45, 0x56, 0x78, 0x12, 0x34, 0x45, 0x56, 0x78, 0x01, 0x22]
-
-
-async def generate_clock(clock_wire):
-    while True:  # repeat forever
-        clock_wire.value = 0
-        await Timer(5, units="ns")
-        clock_wire.value = 1
-        await Timer(5, units="ns")
 
 
 @cocotb.test()
@@ -35,34 +25,15 @@ async def test_a(dut):
     dut.rst_in.value = 0  # un reset device
     await ClockCycles(dut.clk_in, 3)  # wait a few clock cycles
 
-    for i in range(200):
-        for j in range(100):
-            dut.x_in.value = i
-            dut.y_in.value = j
-            dut.valid_in.value = 1
-            await ClockCycles(dut.clk_in, 1)
-
-    dut.valid_in.value = 0
-    dut.tabulate_in.value = 1
+    dut.dividend_in.value = 1990000
+    dut.divisor_in.value = 20000
+    dut.data_valid_in.value = 1
     await ClockCycles(dut.clk_in, 1)
-    dut.tabulate_in.value = 0
-    await ClockCycles(dut.clk_in, 3000)
-
-    for i in range(200):
-        for j in range(100):
-            if i == 100 and j == 69:
-                dut.valid_in.value = 1
-                dut.x_in.value = 100
-                dut.y_in.value = 69
-            else:
-                dut.valid_in.value = 0
-            await ClockCycles(dut.clk_in, 1)
-
-    dut.valid_in.value = 0
-    dut.tabulate_in.value = 1
-    await ClockCycles(dut.clk_in, 1)
-    dut.tabulate_in.value = 0
-    await ClockCycles(dut.clk_in, 3000)
+    dut.data_valid_in.value = 0
+    await RisingEdge(dut.data_valid_out)
+    await FallingEdge(dut.clk_in)
+    assert dut.quotient_out.value == 1990000 // 20000, "Quotient is not correct"
+    assert dut.remainder_out.value == 1990000 % 20000, "Remainder is not correct"
 
 
 """the code below should largely remain unchanged in structure, though the specific files and things
@@ -76,17 +47,14 @@ def center_of_mass_runner():
     sim = os.getenv("SIM", "icarus")
     proj_path = Path(__file__).resolve().parent.parent
     sys.path.append(str(proj_path / "sim" / "model"))
-    sources = [
-        proj_path / "hdl" / "center_of_mass.sv",
-        proj_path / "hdl" / "divider.sv",
-    ]  # grow/modify this as needed.
+    sources = [proj_path / "hdl" / "divider.sv"]  # grow/modify this as needed.
     build_test_args = ["-Wall"]  # ,"COCOTB_RESOLVE_X=ZEROS"]
-    parameters = {}
+    parameters = {"WIDTH": 26}
     sys.path.append(str(proj_path / "sim"))
     runner = get_runner(sim)
     runner.build(
         sources=sources,
-        hdl_toplevel="center_of_mass",
+        hdl_toplevel="divider",
         always=True,
         build_args=build_test_args,
         parameters=parameters,
@@ -95,8 +63,8 @@ def center_of_mass_runner():
     )
     run_test_args = []
     runner.test(
-        hdl_toplevel="center_of_mass",
-        test_module="test_center_of_mass",
+        hdl_toplevel="divider",
+        test_module="test_divider",
         test_args=run_test_args,
         waves=True,
     )
