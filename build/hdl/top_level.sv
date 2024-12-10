@@ -510,7 +510,12 @@ module top_level (
 
   always_ff @(posedge clk_pixel) begin
     if (sys_rst_pixel) begin
-      skeleton_pixel_pipe <= 3'b0;
+      skeleton_pixel_pipe[0] <= 0;
+      skeleton_pixel_pipe[1] <= 0;
+      skeleton_pixel_pipe[2] <= 0;
+      skeleton_valid_pipe[0] <= 0;
+      skeleton_valid_pipe[1] <= 0;
+      skeleton_valid_pipe[2] <= 0;
     end else begin
       skeleton_pixel_pipe[0] <= skeleton_pixel;
       skeleton_pixel_pipe[1] <= skeleton_pixel_pipe[0];
